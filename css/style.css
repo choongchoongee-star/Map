@@ -1,0 +1,153 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body, html, #app {
+    height: 100%;
+    overflow: hidden;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    height: 60px;
+    background: #2c3e50;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 100;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 600px;
+    display: flex;
+    gap: 10px;
+}
+
+#search-input {
+    flex: 1;
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: none;
+}
+
+#search-btn {
+    padding: 8px 20px;
+    background: #27ae60;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+#sidebar {
+    width: 300px;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+#sidebar h3 {
+    margin-bottom: 15px;
+    color: #34495e;
+}
+
+#place-list {
+    list-style: none;
+}
+
+.place-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.place-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.place-item h4 {
+    margin-bottom: 5px;
+    color: #2c3e50;
+}
+
+.place-item p {
+    font-size: 0.85em;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+}
+
+.place-item .category {
+    display: inline-block;
+    background: #e1f5fe;
+    color: #0288d1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75em;
+}
+
+#map {
+    flex: 1;
+}
+
+/* Modal Styling */
+.modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+#search-results-list {
+    list-style: none;
+    margin: 15px 0;
+}
+
+.search-result-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.search-result-item:hover {
+    background: #f1f8ff;
+}
