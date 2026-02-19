@@ -128,19 +128,34 @@ async function handleSearch() {
 
     console.log(`검색어: ${query}`);
     
-    // 가상의 검색 결과 (실제 운영 시 백엔드 프록시 필요)
-    const mockResults = [
-        {
-            name: query,
-            address: "서울 어딘가 맛집",
-            category: "음식점",
-            location: { lat: 37.513 + (Math.random() * 0.05), lng: 127.034 + (Math.random() * 0.05) },
-            naver_url: "https://map.naver.com",
-            added_by: USERNAME
+    // 네이버 지도 Geocoder 서비스를 사용하여 장소 검색 (주소/명칭)
+    naver.maps.Service.geocode({
+        query: query
+    }, function(status, response) {
+        if (status !== naver.maps.Service.Status.OK) {
+            return alert('검색 결과를 찾을 수 없습니다.');
         }
-    ];
 
-    displaySearchResults(mockResults);
+        const items = response.v2.addresses;
+        if (items.length === 0) {
+            return alert('검색 결과가 없습니다.');
+        }
+
+        // 검색된 결과를 포맷팅하여 표시
+        const results = items.map(item => ({
+            name: query, // 검색어로 명칭 대체 (Geocoder는 주소 위주이므로)
+            address: item.roadAddress || item.jibunAddress,
+            category: "음식점", // 기본값
+            location: { 
+                lat: parseFloat(item.y), 
+                lng: parseFloat(item.x) 
+            },
+            naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(query)}`,
+            added_by: USERNAME
+        }));
+
+        displaySearchResults(results);
+    });
 }
 
 function displaySearchResults(results) {
