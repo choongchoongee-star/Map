@@ -27,9 +27,9 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
       },
       "places": {
         "auto_generated_id": {
-          "name": "Jinmi Pyeongyang Naengmyeon",
-          "address": "123, Hakdong-ro, Gangnam-gu, Seoul",
-          "category": "Korean > Cold Noodles",
+          "name": "열무밭에돈",
+          "address": "대구광역시 수성구 상동 321-6",
+          "category": "음식점 > 육류,고기요리",
           "location": { "lat": 37.513, "lng": 127.034 },
           "naver_url": "https://pcmap.place.naver.com/restaurant/12345",
           "added_by": "User_Alpha"
