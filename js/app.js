@@ -140,47 +140,74 @@ function removePlaceFromUI(id) {
 }
 
 // 6. Search & Persistence Logic
+const NAVER_CLIENT_ID = 'B2TJjLUqHonjgR5c5jLE';
+const NAVER_CLIENT_SECRET = 'YOUR_NAVER_CLIENT_SECRET'; // 여기에 Client Secret을 넣어주세요!
+
 async function handleSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
 
-    console.log(`검색어: ${query}`);
+    console.log(`진짜 맛집 검색 중: ${query}`);
     
-    if (typeof naver === 'undefined' || !naver.maps || !naver.maps.Service) {
-        alert('네이버 지도 서비스가 준비되지 않았습니다.');
-        return;
-    }
+    // CORS 문제를 피하기 위해 프록시 서버 사용 (테스트용)
+    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+    const apiUrl = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=10`;
 
-    // Geocoder는 주소 중심이므로, 명칭 검색을 위해 좀 더 유연하게 처리
-    naver.maps.Service.geocode({
-        query: query
-    }, function(status, response) {
-        if (status !== naver.maps.Service.Status.OK) {
-            return alert('검색 중 오류가 발생했습니다.');
-        }
-
-        const items = response.v2.addresses;
-        if (!items || items.length === 0) {
-            return alert('검색 결과가 없습니다. (정확한 주소나 지역명을 입력해보세요)');
-        }
-
-        const results = items.map(item => {
-            const fullAddress = item.roadAddress || item.jibunAddress;
-            return {
-                name: query, // 검색어를 이름으로 사용
-                address: fullAddress,
-                category: "맛집",
-                location: { 
-                    lat: parseFloat(item.y), 
-                    lng: parseFloat(item.x) 
-                },
-                naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(query + " " + fullAddress)}`,
-                added_by: USERNAME
-            };
+    try {
+        const response = await fetch(proxyUrl + apiUrl, {
+            headers: {
+                'X-Naver-Client-Id': NAVER_CLIENT_ID,
+                'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
+            }
         });
 
+        if (!response.ok) {
+            throw new Error('검색 API 호출 실패 (Secret이 정확한지 확인하세요)');
+        }
+
+        const data = await response.json();
+        const items = data.items;
+
+        if (!items || items.length === 0) {
+            return alert('검색 결과가 없습니다. 식당 이름을 정확히 입력해보세요!');
+        }
+
+        // 검색된 맛집 데이터를 지도 좌표로 변환하기 위해 Geocoder 병행 사용
+        const results = [];
+        for (const item of items) {
+            // HTML 태그 제거 (예: <b>진미</b>평양냉면 -> 진미평양냉면)
+            const cleanTitle = item.title.replace(/<[^>]*>?/gm, '');
+            
+            // 주소를 좌표로 변환
+            const geoResult = await new Promise((resolve) => {
+                naver.maps.Service.geocode({ query: item.roadAddress || item.address }, (status, res) => {
+                    if (status === naver.maps.Service.Status.OK && res.v2.addresses.length > 0) {
+                        resolve(res.v2.addresses[0]);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+
+            if (geoResult) {
+                results.push({
+                    name: cleanTitle,
+                    address: item.roadAddress || item.address,
+                    category: item.category,
+                    location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
+                    naver_url: item.link || `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
+                    added_by: USERNAME
+                });
+            }
+        }
+
         displaySearchResults(results);
-    });
+
+    } catch (error) {
+        console.error('검색 오류:', error);
+        alert('검색 중 오류가 발생했습니다. (프록시 사용 권한이 필요할 수 있습니다)');
+        // 프록시 서버 사용 권한이 필요한 경우: https://cors-anywhere.herokuapp.com/corsdemo 접속하여 활성화
+    }
 }
 
 function displaySearchResults(results) {
