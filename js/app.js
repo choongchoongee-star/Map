@@ -78,7 +78,9 @@ function addPlaceToUI(id, data) {
             <div style="padding:10px; min-width:150px;">
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
-                <a href="${data.naver_url}" target="_blank" style="font-size:12px; color:#27ae60">네이버 지도로 보기</a>
+                <div style="margin-top:8px;">
+                    <a href="${data.naver_url}" target="_blank" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
+                </div>
             </div>
         `
     });
@@ -97,11 +99,24 @@ function addPlaceToUI(id, data) {
     li.className = 'place-item';
     li.id = `sidebar-${id}`;
     li.innerHTML = `
-        <div class="category">${data.category}</div>
-        <h4>${data.name}</h4>
-        <p>${data.address}</p>
-        <small>등록자: ${data.added_by}</small>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="flex:1;">
+                <div class="category">${data.category}</div>
+                <h4>${data.name}</h4>
+                <p>${data.address}</p>
+                <small>등록자: ${data.added_by}</small>
+            </div>
+            <button class="delete-btn" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px; padding:5px;">×</button>
+        </div>
     `;
+
+    // 삭제 기능 추가
+    li.querySelector('.delete-btn').addEventListener('click', (e) => {
+        e.stopPropagation(); // 부모 클릭 이벤트(지도 이동) 방지
+        if(confirm(`'${data.name}'을(를) 삭제하시겠습니까?`)) {
+            firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
+        }
+    });
 
     li.addEventListener('click', () => {
         map.panTo(position);
@@ -117,6 +132,9 @@ function removePlaceFromUI(id) {
         markers[id].setMap(null);
         delete markers[id];
     }
+    if (infoWindows[id]) {
+        delete infoWindows[id];
+    }
     const sidebarItem = document.getElementById(`sidebar-${id}`);
     if (sidebarItem) sidebarItem.remove();
 }
@@ -128,41 +146,35 @@ async function handleSearch() {
 
     console.log(`검색어: ${query}`);
     
-    // 네이버 지도 객체가 정상 로드되었는지 확인
     if (typeof naver === 'undefined' || !naver.maps || !naver.maps.Service) {
-        alert('네이버 지도 서비스가 아직 준비되지 않았습니다. 잠시 후 다시 시도하거나 페이지를 새로고침해 주세요.');
+        alert('네이버 지도 서비스가 준비되지 않았습니다.');
         return;
     }
 
-    // 네이버 지도 Geocoder 서비스를 사용하여 장소 검색
+    // Geocoder는 주소 중심이므로, 명칭 검색을 위해 좀 더 유연하게 처리
     naver.maps.Service.geocode({
         query: query
     }, function(status, response) {
         if (status !== naver.maps.Service.Status.OK) {
-            console.error('검색 서비스 오류:', status);
             return alert('검색 중 오류가 발생했습니다.');
         }
 
         const items = response.v2.addresses;
         if (!items || items.length === 0) {
-            return alert('검색 결과가 없습니다. (주소나 큰 장소 위주로 검색해 보세요)');
+            return alert('검색 결과가 없습니다. (정확한 주소나 지역명을 입력해보세요)');
         }
 
         const results = items.map(item => {
-            const placeName = query; // 검색어
             const fullAddress = item.roadAddress || item.jibunAddress;
-            // 실제 네이버 지도 검색 결과 페이지 링크 생성
-            const naverMapLink = `https://map.naver.com/v5/search/${encodeURIComponent(placeName + " " + fullAddress)}`;
-            
             return {
-                name: placeName, 
+                name: query, // 검색어를 이름으로 사용
                 address: fullAddress,
                 category: "맛집",
                 location: { 
                     lat: parseFloat(item.y), 
                     lng: parseFloat(item.x) 
                 },
-                naver_url: naverMapLink,
+                naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(query + " " + fullAddress)}`,
                 added_by: USERNAME
             };
         });
