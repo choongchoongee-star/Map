@@ -140,45 +140,33 @@ function removePlaceFromUI(id) {
 }
 
 // 6. Search & Persistence Logic
-const NAVER_CLIENT_ID = 'B2TJjLUqHonjgR5c5jLE';
-const NAVER_CLIENT_SECRET = 'YOUR_NAVER_CLIENT_SECRET'; // 여기에 Client Secret을 넣어주세요!
-
 async function handleSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
 
-    console.log(`진짜 맛집 검색 중: ${query}`);
+    console.log(`서버를 통해 맛집 검색 중: ${query}`);
     
-    // CORS 문제를 피하기 위해 프록시 서버 사용 (테스트용)
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const apiUrl = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(query)}&display=10`;
+    // Firebase Cloud Function URL
+    const functionUrl = `https://us-central1-dangmoo-map.cloudfunctions.net/naverSearch?query=${encodeURIComponent(query)}`;
 
     try {
-        const response = await fetch(proxyUrl + apiUrl, {
-            headers: {
-                'X-Naver-Client-Id': NAVER_CLIENT_ID,
-                'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
-            }
-        });
+        const response = await fetch(functionUrl);
 
         if (!response.ok) {
-            throw new Error('검색 API 호출 실패 (Secret이 정확한지 확인하세요)');
+            throw new Error('서버 검색 실패. (Blaze 플랜 전환 및 Functions 배포 확인 필요)');
         }
 
         const data = await response.json();
         const items = data.items;
 
         if (!items || items.length === 0) {
-            return alert('검색 결과가 없습니다. 식당 이름을 정확히 입력해보세요!');
+            return alert('검색 결과가 없습니다.');
         }
 
-        // 검색된 맛집 데이터를 지도 좌표로 변환하기 위해 Geocoder 병행 사용
         const results = [];
         for (const item of items) {
-            // HTML 태그 제거 (예: <b>진미</b>평양냉면 -> 진미평양냉면)
             const cleanTitle = item.title.replace(/<[^>]*>?/gm, '');
             
-            // 주소를 좌표로 변환
             const geoResult = await new Promise((resolve) => {
                 naver.maps.Service.geocode({ query: item.roadAddress || item.address }, (status, res) => {
                     if (status === naver.maps.Service.Status.OK && res.v2.addresses.length > 0) {
@@ -205,8 +193,7 @@ async function handleSearch() {
 
     } catch (error) {
         console.error('검색 오류:', error);
-        alert('검색 중 오류가 발생했습니다. (프록시 사용 권한이 필요할 수 있습니다)');
-        // 프록시 서버 사용 권한이 필요한 경우: https://cors-anywhere.herokuapp.com/corsdemo 접속하여 활성화
+        alert('검색 중 오류가 발생했습니다. Firebase Functions가 배포되었는지 확인하세요.');
     }
 }
 
