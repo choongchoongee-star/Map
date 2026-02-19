@@ -41,7 +41,7 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 ```
 
 ## Credentials & Config
-- **Naver Client ID:** `sfwrswo47b`
+- **Naver Client ID:** `3rh84i5w65`
 - **Firebase Project:** `dangmoo-map`
 - **Configuration File:** `js/firebase-config.js`
 
