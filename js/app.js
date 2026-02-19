@@ -148,17 +148,24 @@ async function handleSearch() {
             return alert('검색 결과가 없습니다. (주소나 큰 장소 위주로 검색해 보세요)');
         }
 
-        const results = items.map(item => ({
-            name: query, 
-            address: item.roadAddress || item.jibunAddress,
-            category: "맛집",
-            location: { 
-                lat: parseFloat(item.y), 
-                lng: parseFloat(item.x) 
-            },
-            naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(query)}`,
-            added_by: USERNAME
-        }));
+        const results = items.map(item => {
+            const placeName = query; // 검색어
+            const fullAddress = item.roadAddress || item.jibunAddress;
+            // 실제 네이버 지도 검색 결과 페이지 링크 생성
+            const naverMapLink = `https://map.naver.com/v5/search/${encodeURIComponent(placeName + " " + fullAddress)}`;
+            
+            return {
+                name: placeName, 
+                address: fullAddress,
+                category: "맛집",
+                location: { 
+                    lat: parseFloat(item.y), 
+                    lng: parseFloat(item.x) 
+                },
+                naver_url: naverMapLink,
+                added_by: USERNAME
+            };
+        });
 
         displaySearchResults(results);
     });
