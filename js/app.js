@@ -128,24 +128,30 @@ async function handleSearch() {
 
     console.log(`검색어: ${query}`);
     
-    // 네이버 지도 Geocoder 서비스를 사용하여 장소 검색 (주소/명칭)
+    // 네이버 지도 객체가 정상 로드되었는지 확인
+    if (typeof naver === 'undefined' || !naver.maps || !naver.maps.Service) {
+        alert('네이버 지도 서비스가 아직 준비되지 않았습니다. 잠시 후 다시 시도하거나 페이지를 새로고침해 주세요.');
+        return;
+    }
+
+    // 네이버 지도 Geocoder 서비스를 사용하여 장소 검색
     naver.maps.Service.geocode({
         query: query
     }, function(status, response) {
         if (status !== naver.maps.Service.Status.OK) {
-            return alert('검색 결과를 찾을 수 없습니다.');
+            console.error('검색 서비스 오류:', status);
+            return alert('검색 중 오류가 발생했습니다.');
         }
 
         const items = response.v2.addresses;
-        if (items.length === 0) {
-            return alert('검색 결과가 없습니다.');
+        if (!items || items.length === 0) {
+            return alert('검색 결과가 없습니다. (주소나 큰 장소 위주로 검색해 보세요)');
         }
 
-        // 검색된 결과를 포맷팅하여 표시
         const results = items.map(item => ({
-            name: query, // 검색어로 명칭 대체 (Geocoder는 주소 위주이므로)
+            name: query, 
             address: item.roadAddress || item.jibunAddress,
-            category: "음식점", // 기본값
+            category: "맛집",
             location: { 
                 lat: parseFloat(item.y), 
                 lng: parseFloat(item.x) 
