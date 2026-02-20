@@ -1,4 +1,4 @@
-# Real-time Collaborative Restaurant Map (FoodScout)
+# Real-time Collaborative Restaurant Map (Dangmoo Map)
 
 ## Project Overview
 A web-based interactive map allowing small groups (<10 people) to search, add, and synchronize "Restaurant Places" in real-time. Changes made by one user are immediately reflected on all connected clients without page refreshes.
@@ -13,6 +13,7 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 - **Dynamic Map:** Responsive Naver Map instance centered on Seoul.
 - **Real-time Sync:** `child_added` and `child_removed` listeners ensure state consistency across all users.
 - **Shared Sidebar:** Persistent list of added restaurants with metadata (category, who added).
+- **Responsive Design:** Mobile-optimized UI with toggleable sidebar and adaptive layouts.
 - **Focus Sync:** Clicking a sidebar item pans the map to the specific restaurant marker.
 - **Deep Linking:** Markers include direct links to official Naver Map entries.
 
@@ -50,5 +51,6 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 - [x] Naver Maps initialization
 - [x] Firebase RTDB integration
 - [x] Real-time markers and sidebar synchronization
+- [x] Responsive Design (Mobile Support)
 - [x] Mock search interface (Prototype)
 - [ ] Production-ready Naver Local Search API (Requires backend proxy)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer-when-downgrade">
-    <title>실시간 맛집 지도</title>
+    <title>당무 지도 (Dangmoo Map)</title>
     <link rel="stylesheet" href="css/style.css">
     <!-- Naver Maps API -->
     <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=3rh84i5w65&submodules=geocoder"></script>
@@ -12,13 +12,16 @@
 <body>
     <div id="app">
         <header>
-            <div class="logo">🍴 맛집탐정 (FoodScout)</div>
+            <div class="header-left">
+                <button id="menu-toggle" aria-label="Toggle Menu">☰</button>
+                <div class="logo">🥕 당무 지도</div>
+            </div>
             <div class="search-container">
-                <input type="text" id="search-input" placeholder="맛집을 검색하세요 (예: 열무밭에돈)...">
+                <input type="text" id="search-input" placeholder="검색...">
                 <button id="search-btn">검색</button>
             </div>
             <div class="user-info">
-                <span id="username-display">접속 중...</span>
+                <span id="username-display">...</span>
             </div>
         </header>
 

@@ -17,6 +17,8 @@ const usernameDisplay = document.getElementById('username-display');
 const resultsModal = document.getElementById('search-results-modal');
 const resultsList = document.getElementById('search-results-list');
 const closeModal = document.getElementById('close-modal');
+const sidebar = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menu-toggle');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,6 +29,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // UI Events
     searchBtn.addEventListener('click', handleSearch);
     closeModal.addEventListener('click', () => resultsModal.classList.add('hidden'));
+
+    // Sidebar Toggle for Mobile
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('active');
+    });
 });
 
 // 3. Map Logic
@@ -36,6 +43,13 @@ function initMap() {
         zoom: 13
     };
     map = new naver.maps.Map('map', mapOptions);
+
+    // Close sidebar on mobile when map is clicked
+    naver.maps.Event.addListener(map, 'click', () => {
+        if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
+    });
 }
 
 // 4. Firebase Logic (Real-time Sync)
@@ -99,14 +113,14 @@ function addPlaceToUI(id, data) {
     li.className = 'place-item';
     li.id = `sidebar-${id}`;
     li.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div style="flex:1;">
+        <div class="place-content">
+            <div class="place-info">
                 <div class="category">${data.category}</div>
                 <h4>${data.name}</h4>
                 <p>${data.address}</p>
                 <small>등록자: ${data.added_by}</small>
             </div>
-            <button class="delete-btn" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px; padding:5px;">×</button>
+            <button class="delete-btn" title="삭제">×</button>
         </div>
     `;
 
@@ -122,6 +136,11 @@ function addPlaceToUI(id, data) {
         map.panTo(position);
         map.setZoom(16);
         infoWindow.open(map, marker);
+        
+        // On mobile, close sidebar after clicking an item
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('active');
+        }
     });
 
     placeList.appendChild(li);
@@ -144,7 +163,7 @@ async function handleSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
 
-    console.log(`서버를 통해 맛집 검색 중: ${query}`);
+    console.log(`당무 지도를 통해 맛집 검색 중: ${query}`);
     
     // Firebase Cloud Function URL
     const functionUrl = `https://us-central1-dangmoo-map.cloudfunctions.net/naverSearch?query=${encodeURIComponent(query)}`;
