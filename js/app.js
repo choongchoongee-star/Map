@@ -197,12 +197,13 @@ async function handleSearch() {
             });
 
             if (geoResult) {
+                const searchAddress = item.roadAddress || item.address;
                 results.push({
                     name: cleanTitle,
-                    address: item.roadAddress || item.address,
+                    address: searchAddress,
                     category: item.category,
                     location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
-                    naver_url: item.link || `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
+                    naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle + ' ' + searchAddress)}`,
                     added_by: USERNAME
                 });
             }

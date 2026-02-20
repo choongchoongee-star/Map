@@ -47,6 +47,14 @@ header {
     font-weight: bold;
     font-size: 1.2rem;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-img {
+    height: 32px;
+    width: auto;
 }
 
 .search-container {
