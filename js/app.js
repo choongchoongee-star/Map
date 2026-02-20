@@ -75,6 +75,9 @@ function initFirebaseListeners() {
 
 // 5. UI Updates
 function addPlaceToUI(id, data) {
+    // Force a fresh search-based URL to avoid any legacy Instagram links
+    const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(data.name + ' ' + (data.address || ''))}`;
+
     // A. Add Marker
     const position = new naver.maps.LatLng(data.location.lat, data.location.lng);
     const marker = new naver.maps.Marker({
@@ -93,7 +96,7 @@ function addPlaceToUI(id, data) {
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
                 <div style="margin-top:8px;">
-                    <a href="${data.naver_url}" target="_blank" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
+                    <a href="${reliableNaverUrl}" target="_blank" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
                 </div>
             </div>
         `
@@ -118,6 +121,9 @@ function addPlaceToUI(id, data) {
                 <div class="category">${data.category}</div>
                 <h4>${data.name}</h4>
                 <p>${data.address}</p>
+                <div style="margin-bottom: 5px;">
+                    <a href="${reliableNaverUrl}" target="_blank" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
+                </div>
                 <small>등록자: ${data.added_by}</small>
             </div>
             <button class="delete-btn" title="삭제">×</button>
@@ -130,6 +136,10 @@ function addPlaceToUI(id, data) {
         if(confirm(`'${data.name}'을(를) 삭제하시겠습니까?`)) {
             firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
         }
+    });
+
+    li.querySelector('.naver-link').addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevents centering map when clicking the link
     });
 
     li.addEventListener('click', () => {
