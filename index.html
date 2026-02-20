@@ -31,10 +31,22 @@
 
         <main>
             <aside id="sidebar">
-                <h3>공유 리스트</h3>
+                <div class="sidebar-header">
+                    <h3>공유 리스트</h3>
+                    <div class="filter-container">
+                        <label class="switch">
+                            <input type="checkbox" id="filter-visible">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="filter-label">현재 지도 내 검색</span>
+                    </div>
+                </div>
                 <ul id="place-list">
                     <!-- 맛집 목록이 여기에 동적으로 추가됩니다 -->
                 </ul>
+                <div id="pagination" class="pagination-container">
+                    <!-- 페이지네이션 버튼이 여기에 추가됩니다 -->
+                </div>
             </aside>
             <div id="map"></div>
         </main>

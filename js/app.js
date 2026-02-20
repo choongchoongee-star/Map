@@ -9,6 +9,12 @@ let infoWindows = {};
 const USERNAME = 'User_' + Math.floor(Math.random() * 1000);
 const SESSION_ID = 'session_001'; // Default session
 
+// Pagination & Filtering State
+let allPlaces = []; 
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
+let filterVisibleOnly = false;
+
 // DOM Elements
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
@@ -19,6 +25,8 @@ const resultsList = document.getElementById('search-results-list');
 const closeModal = document.getElementById('close-modal');
 const sidebar = document.getElementById('sidebar');
 const menuToggle = document.getElementById('menu-toggle');
+const filterVisibleCheckbox = document.getElementById('filter-visible');
+const paginationContainer = document.getElementById('pagination');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,12 +36,29 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // UI Events
     searchBtn.addEventListener('click', handleSearch);
+    
+    // Enter key for search
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    });
+
     closeModal.addEventListener('click', () => resultsModal.classList.add('hidden'));
 
     // Sidebar Toggle for Mobile
     menuToggle.addEventListener('click', () => {
         sidebar.classList.toggle('active');
     });
+
+    // Map filter toggle
+    if (filterVisibleCheckbox) {
+        filterVisibleCheckbox.addEventListener('change', (e) => {
+            filterVisibleOnly = e.target.checked;
+            currentPage = 1;
+            updateSidebarDisplay();
+        });
+    }
 });
 
 // 3. Map Logic
@@ -50,6 +75,14 @@ function initMap() {
             sidebar.classList.remove('active');
         }
     });
+
+    // Re-render sidebar when map bounds change (if filter is active)
+    naver.maps.Event.addListener(map, 'bounds_changed', () => {
+        if (filterVisibleOnly) {
+            currentPage = 1;
+            updateSidebarDisplay();
+        }
+    });
 }
 
 // 4. Firebase Logic (Real-time Sync)
@@ -63,22 +96,37 @@ function initFirebaseListeners() {
     placesRef.on('child_added', (snapshot) => {
         const placeId = snapshot.key;
         const placeData = snapshot.val();
-        addPlaceToUI(placeId, placeData);
+        
+        // Add to local state
+        allPlaces.push({ id: placeId, ...placeData });
+        
+        // Add marker immediately
+        addMarker(placeId, placeData);
+        
+        // Update sidebar
+        updateSidebarDisplay();
     });
 
     // Listen for deletions
     placesRef.on('child_removed', (snapshot) => {
         const placeId = snapshot.key;
-        removePlaceFromUI(placeId);
+        
+        // Remove from local state
+        allPlaces = allPlaces.filter(p => p.id !== placeId);
+        
+        // Remove marker
+        removeMarkerFromUI(placeId);
+        
+        // Update sidebar
+        updateSidebarDisplay();
     });
 }
 
-// 5. UI Updates
-function addPlaceToUI(id, data) {
-    // Force a fresh search-based URL to avoid any legacy Instagram links
-    const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(data.name + ' ' + (data.address || ''))}`;
+// 5. UI Updates (Marker)
+function addMarker(id, data) {
+    // Force a reliable search-based URL (Restaurant Name Only)
+    const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(data.name)}`;
 
-    // A. Add Marker
     const position = new naver.maps.LatLng(data.location.lat, data.location.lng);
     const marker = new naver.maps.Marker({
         position: position,
@@ -89,7 +137,6 @@ function addPlaceToUI(id, data) {
 
     markers[id] = marker;
 
-    // Info Window
     const infoWindow = new naver.maps.InfoWindow({
         content: `
             <div style="padding:10px; min-width:150px;">
@@ -110,53 +157,9 @@ function addPlaceToUI(id, data) {
             infoWindow.open(map, marker);
         }
     });
-
-    // B. Add Sidebar Item
-    const li = document.createElement('li');
-    li.className = 'place-item';
-    li.id = `sidebar-${id}`;
-    li.innerHTML = `
-        <div class="place-content">
-            <div class="place-info">
-                <div class="category">${data.category}</div>
-                <h4>${data.name}</h4>
-                <p>${data.address}</p>
-                <div style="margin-bottom: 5px;">
-                    <a href="${reliableNaverUrl}" target="_blank" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
-                </div>
-                <small>등록자: ${data.added_by}</small>
-            </div>
-            <button class="delete-btn" title="삭제">×</button>
-        </div>
-    `;
-
-    // 삭제 기능 추가
-    li.querySelector('.delete-btn').addEventListener('click', (e) => {
-        e.stopPropagation(); // 부모 클릭 이벤트(지도 이동) 방지
-        if(confirm(`'${data.name}'을(를) 삭제하시겠습니까?`)) {
-            firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
-        }
-    });
-
-    li.querySelector('.naver-link').addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevents centering map when clicking the link
-    });
-
-    li.addEventListener('click', () => {
-        map.panTo(position);
-        map.setZoom(16);
-        infoWindow.open(map, marker);
-        
-        // On mobile, close sidebar after clicking an item
-        if (window.innerWidth <= 768) {
-            sidebar.classList.remove('active');
-        }
-    });
-
-    placeList.appendChild(li);
 }
 
-function removePlaceFromUI(id) {
+function removeMarkerFromUI(id) {
     if (markers[id]) {
         markers[id].setMap(null);
         delete markers[id];
@@ -164,9 +167,106 @@ function removePlaceFromUI(id) {
     if (infoWindows[id]) {
         delete infoWindows[id];
     }
-    const sidebarItem = document.getElementById(`sidebar-${id}`);
-    if (sidebarItem) sidebarItem.remove();
 }
+
+// Sidebar Display Update (Filtering & Pagination)
+function updateSidebarDisplay() {
+    let filtered = [...allPlaces];
+    
+    // Filter by map bounds if toggle is active
+    if (filterVisibleOnly && map) {
+        const bounds = map.getBounds();
+        filtered = filtered.filter(place => {
+            const pos = new naver.maps.LatLng(place.location.lat, place.location.lng);
+            return bounds.hasLatLng(pos);
+        });
+    }
+
+    // Pagination logic
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+    
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const pageItems = filtered.slice(startIndex, endIndex);
+
+    renderPlaceList(pageItems);
+    renderPagination(totalPages);
+}
+
+function renderPlaceList(items) {
+    placeList.innerHTML = '';
+    
+    if (items.length === 0) {
+        placeList.innerHTML = '<li style="text-align:center; color:#999; padding:20px;">검색 결과가 없습니다.</li>';
+        return;
+    }
+
+    items.forEach(place => {
+        const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
+        const li = document.createElement('li');
+        li.className = 'place-item';
+        li.id = `sidebar-${place.id}`;
+        li.innerHTML = `
+            <div class="place-content">
+                <div class="place-info">
+                    <div class="category">${place.category}</div>
+                    <h4>${place.name}</h4>
+                    <p>${place.address}</p>
+                    <div style="margin-bottom: 5px;">
+                        <a href="${reliableNaverUrl}" target="_blank" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
+                    </div>
+                </div>
+                <button class="delete-btn" title="삭제" onclick="deletePlace('${place.id}', '${place.name}')">×</button>
+            </div>
+        `;
+
+        li.querySelector('.naver-link').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        li.addEventListener('click', () => {
+            const position = new naver.maps.LatLng(place.location.lat, place.location.lng);
+            map.panTo(position);
+            map.setZoom(16);
+            if (infoWindows[place.id]) infoWindows[place.id].open(map, markers[place.id]);
+            
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+            }
+        });
+
+        placeList.appendChild(li);
+    });
+}
+
+function renderPagination(totalPages) {
+    paginationContainer.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+
+    for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
+        btn.textContent = i;
+        btn.onclick = () => {
+            currentPage = i;
+            updateSidebarDisplay();
+            sidebar.scrollTop = 0; // Scroll back to top
+        };
+        paginationContainer.appendChild(btn);
+    }
+}
+
+// Global deletion function (to handle onclick from dynamic HTML)
+window.deletePlace = (id, name) => {
+    if(confirm(`'${name}'을(를) 삭제하시겠습니까?`)) {
+        firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
+    }
+};
 
 // 6. Search & Persistence Logic
 async function handleSearch() {
@@ -213,7 +313,8 @@ async function handleSearch() {
                     address: searchAddress,
                     category: item.category,
                     location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
-                    naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle + ' ' + searchAddress)}`,
+                    // Save as base search URL but name-only
+                    naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
                     added_by: USERNAME
                 });
             }
