@@ -384,7 +384,9 @@ function renderPlaceList(items) {
         const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
         const likes = place.likes || {};
         const likeCount = Object.keys(likes).length;
-        const isLiked = !!likes[USERNAME];
+        const userId = currentUser ? currentUser.uid : 'anon';
+        const isLiked = !!likes[userId];
+        const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
         const li = document.createElement('li');
         li.className = 'place-item';
@@ -400,10 +402,15 @@ function renderPlaceList(items) {
                             <span class="heart-icon">${isLiked ? '❤️' : '🤍'}</span>
                             <span class="like-count">${likeCount}</span>
                         </button>
+                        ${showSaveBtn ? `
+                        <button class="save-to-my-btn" onclick="event.stopPropagation(); copyPlace('${place.id}')" title="내 리스트로 저장">
+                            📥 저장
+                        </button>
+                        ` : ''}
                         <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
                     </div>
                 </div>
-                <button class="delete-btn" title="삭제" onclick="deletePlace('${place.id}', '${place.name}')">×</button>
+                ${currentSessionId !== PUBLIC_SESSION_ID ? `<button class="delete-btn" title="삭제" onclick="deletePlace('${place.id}', '${place.name}')">×</button>` : ''}
             </div>
         `;
 
@@ -475,6 +482,49 @@ window.toggleLike = (id) => {
     } else {
         ref.set(true);
     }
+};
+
+window.copyPlace = (id) => {
+    if (!currentUser) {
+        alert("내 리스트에 저장하려면 로그인이 필요합니다.");
+        return;
+    }
+
+    const placeToCopy = allPlaces.find(p => p.id === id);
+    if (!placeToCopy) return;
+
+    const targetSessionId = `private_${currentUser.uid}`;
+    const targetPath = `user_sessions/${targetSessionId}/places`;
+    const db = firebase.database();
+
+    // Check for duplicates in the target private session
+    db.ref(targetPath).once('value', (snapshot) => {
+        const privatePlaces = snapshot.val() || {};
+        const isAlreadyAdded = Object.values(privatePlaces).some(p => 
+            p.name === placeToCopy.name && p.address === placeToCopy.address
+        );
+
+        if (isAlreadyAdded) {
+            alert(`'${placeToCopy.name}'은(는) 이미 내 리스트에 있습니다.`);
+            return;
+        }
+
+        // Copy the data (exclude the ID and old likes)
+        const newPlaceData = {
+            name: placeToCopy.name,
+            address: placeToCopy.address,
+            category: placeToCopy.category,
+            location: placeToCopy.location,
+            naver_url: placeToCopy.naver_url,
+            added_by: currentUser.displayName || currentUser.email,
+            copied_from: PUBLIC_SESSION_ID,
+            created_at: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        db.ref(targetPath).push(newPlaceData)
+            .then(() => alert(`'${placeToCopy.name}'을(를) 내 리스트에 저장했습니다!`))
+            .catch(err => console.error("복사 오류:", err));
+    });
 };
 
 // 6. Search & Persistence Logic

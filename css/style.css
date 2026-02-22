@@ -192,6 +192,23 @@ main {
     color: #e74c3c;
 }
 
+.save-to-my-btn {
+    background: #f1f8ff;
+    border: 1px solid #007bff;
+    color: #007bff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.save-to-my-btn:hover {
+    background: #007bff;
+    color: white;
+}
+
 .like-btn:hover {
     opacity: 0.8;
 }
