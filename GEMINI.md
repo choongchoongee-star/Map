@@ -15,7 +15,7 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 - **Shared Sidebar:** Persistent list of added restaurants with metadata (category, who added).
 - **Responsive Design:** Mobile-optimized UI with toggleable sidebar and adaptive layouts.
 - **Focus Sync:** Clicking a sidebar item pans the map to the specific restaurant marker.
-- **Deep Linking:** Markers include direct links to official Naver Map entries.
+- **Deep Linking:** Markers include mobile-optimized links to official Naver Map entries (cross-device compatibility).
 
 ## Data Schema (Firebase RTDB)
 ```json
@@ -53,4 +53,4 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 - [x] Real-time markers and sidebar synchronization
 - [x] Responsive Design (Mobile Support)
 - [x] Mock search interface (Prototype)
-- [ ] Production-ready Naver Local Search API (Requires backend proxy)
+- [x] Production-ready Naver Local Search API (Firebase Cloud Functions Proxy)
