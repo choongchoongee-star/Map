@@ -120,11 +120,11 @@ main {
     color: #34495e;
 }
 
-.sort-container {
+.sort-container, .category-filter-container {
     width: 100%;
 }
 
-#sort-select {
+#sort-select, #category-select {
     width: 100%;
     padding: 6px;
     border-radius: 4px;

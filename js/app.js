@@ -15,6 +15,7 @@ let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
 let filterVisibleOnly = false;
 let sortOrder = 'date'; // Default: date, others: likes, distance
+let currentCategory = 'all';
 
 // DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -29,6 +30,7 @@ const menuToggle = document.getElementById('menu-toggle');
 const filterVisibleCheckbox = document.getElementById('filter-visible');
 const paginationContainer = document.getElementById('pagination');
 const sortSelect = document.getElementById('sort-select');
+const categorySelect = document.getElementById('category-select');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -65,6 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sortSelect) {
         sortSelect.addEventListener('change', (e) => {
             sortOrder = e.target.value;
+            currentPage = 1;
+            updateSidebarDisplay();
+        });
+    }
+
+    if (categorySelect) {
+        categorySelect.addEventListener('change', (e) => {
+            currentCategory = e.target.value;
             currentPage = 1;
             updateSidebarDisplay();
         });
@@ -120,7 +130,8 @@ function initFirebaseListeners() {
         // Add marker immediately
         addMarker(placeId, placeData);
         
-        // Update sidebar
+        // Refresh category options and update sidebar
+        updateCategoryOptions();
         updateSidebarDisplay();
     });
 
@@ -133,6 +144,7 @@ function initFirebaseListeners() {
         const idx = allPlaces.findIndex(p => p.id === placeId);
         if (idx !== -1) {
             allPlaces[idx] = { id: placeId, ...placeData };
+            updateCategoryOptions();
             updateSidebarDisplay();
         }
     });
@@ -147,7 +159,8 @@ function initFirebaseListeners() {
         // Remove marker
         removeMarkerFromUI(placeId);
         
-        // Update sidebar
+        // Refresh category options and update sidebar
+        updateCategoryOptions();
         updateSidebarDisplay();
     });
 }
@@ -199,6 +212,40 @@ function removeMarkerFromUI(id) {
     }
 }
 
+function updateCategoryOptions() {
+    if (!categorySelect) return;
+
+    const categories = new Set();
+    allPlaces.forEach(place => {
+        if (place.category) {
+            // Take the first part of the category (e.g., '카페' from '음식점 > 카페')
+            const mainCat = place.category.split('>').pop().trim();
+            categories.add(mainCat);
+        }
+    });
+
+    // Save current selection
+    const previousSelection = categorySelect.value;
+    
+    // Clear and add 'all'
+    categorySelect.innerHTML = '<option value="all">모든 카테고리</option>';
+    
+    // Add sorted categories
+    Array.from(categories).sort().forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        categorySelect.appendChild(option);
+    });
+
+    // Restore selection if it still exists
+    if (Array.from(categories).includes(previousSelection)) {
+        categorySelect.value = previousSelection;
+    } else {
+        currentCategory = 'all';
+    }
+}
+
 // Sidebar Display Update (Filtering, Sorting & Pagination)
 function updateSidebarDisplay() {
     let filtered = [...allPlaces];
@@ -209,6 +256,14 @@ function updateSidebarDisplay() {
         filtered = filtered.filter(place => {
             const pos = new naver.maps.LatLng(place.location.lat, place.location.lng);
             return bounds.hasLatLng(pos);
+        });
+    }
+
+    // Filter by category
+    if (currentCategory !== 'all') {
+        filtered = filtered.filter(place => {
+            const mainCat = place.category.split('>').pop().trim();
+            return mainCat === currentCategory;
         });
     }
 
