@@ -55,6 +55,7 @@ let sessionToCopyId = null;
 let placeToCopyData = null;
 let userSessionsCache = {}; // Cache of user's session names
 let savedPlacesMap = {}; // Map of name+address to boolean
+let guestSessions = JSON.parse(localStorage.getItem('guestSessions')) || {}; // { id: name }
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -83,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     manageSessionsBtn.addEventListener('click', () => {
-        if (!currentUser) return alert("세션 관리를 위해서는 로그인이 필요합니다.");
         sessionModal.classList.remove('hidden');
     });
 
@@ -210,32 +210,53 @@ function updateSessionOptions(user) {
         // Fetch shared sessions from user profile
         const db = firebase.database();
         db.ref(`users/${user.uid}/sessions`).on('value', (snapshot) => {
-            const sessions = snapshot.val() || {};
+            const dbSessions = snapshot.val() || {};
             // Refresh shared options (keep public/private)
             sessionSelect.innerHTML = `<option value="${PUBLIC_SESSION_ID}">전체 공유 리스트</option>`;
             sessionSelect.appendChild(privateOpt);
             
             userSessionsCache = { [privateId]: "내 개인 리스트" };
-            Object.keys(sessions).forEach(sid => {
+            Object.keys(dbSessions).forEach(sid => {
                 const opt = document.createElement('option');
                 opt.value = sid;
-                const name = sessions[sid].name || "친구와 공유된 리스트";
+                const name = dbSessions[sid].name || "친구와 공유된 리스트";
                 opt.textContent = name;
                 sessionSelect.appendChild(opt);
                 userSessionsCache[sid] = name;
+            });
+
+            // Add Guest Sessions (from LocalStorage)
+            Object.keys(guestSessions).forEach(sid => {
+                if (!userSessionsCache[sid]) {
+                    const opt = document.createElement('option');
+                    opt.value = sid;
+                    opt.textContent = guestSessions[sid] + " (참여중)";
+                    sessionSelect.appendChild(opt);
+                    userSessionsCache[sid] = guestSessions[sid];
+                }
             });
 
             // Keep correct selection
             sessionSelect.value = currentSessionId;
             
             // Also update the management list in the modal
-            renderSessionManagementList(sessions);
+            renderSessionManagementList(dbSessions);
             
             // Start listening to all these sessions for "Saved" markers
-            listenToAllUserSessions(user.uid, sessions);
+            listenToAllUserSessions(user.uid, dbSessions);
         });
     } else {
-        renderSessionManagementList({}); // Clear if logged out
+        // Not Logged In: Only Public + Guest (Local)
+        userSessionsCache = {};
+        Object.keys(guestSessions).forEach(sid => {
+            const opt = document.createElement('option');
+            opt.value = sid;
+            opt.textContent = guestSessions[sid] + " (참여중)";
+            sessionSelect.appendChild(opt);
+            userSessionsCache[sid] = guestSessions[sid];
+        });
+        
+        renderSessionManagementList({}); 
         savedPlacesMap = {};
     }
 }
@@ -244,7 +265,10 @@ function listenToAllUserSessions(uid, sessions) {
     const db = firebase.database();
     savedPlacesMap = {};
     
-    const allSessionIds = [`private_${uid}`, ...Object.keys(sessions)];
+    // For non-logged in users, we only track guestSessions
+    const allSessionIds = uid 
+        ? [`private_${uid}`, ...Object.keys(sessions), ...Object.keys(guestSessions)]
+        : [...Object.keys(guestSessions)];
     
     allSessionIds.forEach(sid => {
         const path = sid.startsWith('private_') ? `user_sessions/${sid}/places` : `shared_sessions/${sid}/places`;
@@ -263,28 +287,28 @@ function renderSessionManagementList(sessions) {
     if (!userSessionsList) return;
     userSessionsList.innerHTML = '';
 
-    if (!currentUser) {
-        userSessionsList.innerHTML = '<li>로그인이 필요합니다.</li>';
-        return;
+    // 1. Add Private Session (If Logged In)
+    if (currentUser) {
+        const privateSessionId = `private_${currentUser.uid}`;
+        addSessionRowToModal(privateSessionId, "내 개인 리스트 (기본)", true);
     }
 
-    // 1. Add Private Session (The default one)
-    const privateSessionId = `private_${currentUser.uid}`;
-    addSessionRowToModal(privateSessionId, "내 개인 리스트 (기본)", true);
-
-    // 2. Add Other Shared Sessions
+    // 2. Add DB Shared Sessions
     Object.keys(sessions).forEach(sid => {
         addSessionRowToModal(sid, sessions[sid].name, false);
     });
+
+    // 3. Add Guest Sessions
+    Object.keys(guestSessions).forEach(sid => {
+        if (!sessions[sid] && (!currentUser || sid !== `private_${currentUser.uid}`)) {
+            addSessionRowToModal(sid, guestSessions[sid], false, true);
+        }
+    });
 }
 
-function addSessionRowToModal(sessionId, name, isDefaultPrivate) {
+function addSessionRowToModal(sessionId, name, isDefaultPrivate, isGuest = false) {
     const li = document.createElement('li');
     li.className = 'session-row';
-    
-    // We'll need to check if the user is the creator for the delete button
-    // For now, let's show delete for any session they joined (Leave) 
-    // and creator (Delete)
     
     li.innerHTML = `
         <div class="session-row-info">
@@ -293,7 +317,7 @@ function addSessionRowToModal(sessionId, name, isDefaultPrivate) {
         </div>
         <div class="session-row-actions">
             <button class="action-btn-small copy-code-btn" onclick="copySessionCode('${sessionId}')">코드 복사</button>
-            ${!isDefaultPrivate ? `<button class="action-btn-small delete-session-btn" onclick="deleteSession('${sessionId}', '${name}')">삭제</button>` : ''}
+            ${!isDefaultPrivate ? `<button class="action-btn-small delete-session-btn" onclick="deleteSession('${sessionId}', '${name}', ${isGuest})">삭제</button>` : ''}
         </div>
     `;
     userSessionsList.appendChild(li);
@@ -304,7 +328,6 @@ window.copySessionCode = (code) => {
         alert("초대 코드가 클립보드에 복사되었습니다: " + code);
     }).catch(err => {
         console.error('클립보드 복사 실패:', err);
-        // Fallback for some environments
         const textArea = document.createElement("textarea");
         textArea.value = code;
         document.body.appendChild(textArea);
@@ -315,26 +338,27 @@ window.copySessionCode = (code) => {
     });
 };
 
-function deleteSession(sessionId, name) {
-    if (!currentUser) return;
-    if (!confirm(`'${name}' 목록을 삭제하시겠습니까? (더 이상 이 리스트를 볼 수 없게 됩니다)`)) return;
+function deleteSession(sessionId, name, isGuest = false) {
+    if (!confirm(`'${name}' 목록을 삭제하시겠습니까?`)) return;
 
+    if (isGuest) {
+        delete guestSessions[sessionId];
+        localStorage.setItem('guestSessions', JSON.stringify(guestSessions));
+        if (currentSessionId === sessionId) handleSessionSwitch(PUBLIC_SESSION_ID);
+        updateSessionOptions(currentUser);
+        return;
+    }
+
+    if (!currentUser) return;
     const db = firebase.database();
-    
-    // 1. Remove from user's sessions list
     db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove()
         .then(() => {
-            // 2. If it's a shared session, we could check if user is creator to delete entirely
-            // but for now, "delete" just means "remove from my view" unless we want full cleanup.
-            // Let's also remove user from session members.
             if (sessionId.startsWith('shared_')) {
                 return db.ref(`shared_sessions/${sessionId}/members/${currentUser.uid}`).remove();
             }
         })
         .then(() => {
-            if (currentSessionId === sessionId) {
-                handleSessionSwitch(PUBLIC_SESSION_ID);
-            }
+            if (currentSessionId === sessionId) handleSessionSwitch(PUBLIC_SESSION_ID);
             alert(`'${name}' 목록이 삭제되었습니다.`);
         })
         .catch(err => console.error("세션 삭제 오류:", err));
@@ -393,53 +417,44 @@ function createSharedSession() {
 }
 
 function joinSharedSession() {
-    if (!currentUser) return;
     const code = joinSessionCodeInput.value.trim();
     if (!code) return alert("초대 코드를 입력하세요.");
 
     const db = firebase.database();
     
-    // Logic to handle both shared_ and private_ sessions
-    let sessionPath = '';
-    if (code.startsWith('private_')) {
-        // If it's a private session, it's stored in user_sessions
-        // We'll treat its "places" as the shared data
-        sessionPath = `user_sessions/${code}/places`;
+    const finalizeJoin = (sid, name) => {
+        guestSessions[sid] = name;
+        localStorage.setItem('guestSessions', JSON.stringify(guestSessions));
         
-        // Check if it exists by checking for places or just trying to join
+        if (currentUser) {
+            // Also sync to user profile if logged in
+            db.ref(`users/${currentUser.uid}/sessions/${sid}`).set({ name: name });
+        }
+        
+        alert(`'${name}' 목록에 성공적으로 참여했습니다!`);
+        joinSessionCodeInput.value = '';
+        sessionModal.classList.add('hidden');
+        handleSessionSwitch(sid);
+        updateSessionOptions(currentUser);
+    };
+
+    // Logic to handle both shared_ and private_ sessions
+    if (code.startsWith('private_')) {
         db.ref(`user_sessions/${code}`).once('value', (snapshot) => {
             if (!snapshot.exists()) return alert("유효하지 않은 초대 코드입니다.");
-            
-            // Add to user's profile
-            db.ref(`users/${currentUser.uid}/sessions/${code}`).set({ name: "공유받은 개인 리스트" })
-                .then(() => {
-                    alert(`개인 리스트에 성공적으로 참여했습니다!`);
-                    joinSessionCodeInput.value = '';
-                    sessionModal.classList.add('hidden');
-                    handleSessionSwitch(code);
-                });
+            finalizeJoin(code, "공유받은 개인 리스트");
         });
         return;
     }
 
-    // Standard shared session logic
     db.ref(`shared_sessions/${code}/metadata`).once('value', (snapshot) => {
         const metadata = snapshot.val();
         if (!metadata) return alert("유효하지 않은 초대 코드입니다.");
 
-        // 2. Add user to session members
-        db.ref(`shared_sessions/${code}/members/${currentUser.uid}`).set(true)
-            .then(() => {
-                // 3. Add session to user's profile
-                return db.ref(`users/${currentUser.uid}/sessions/${code}`).set({ name: metadata.name });
-            })
-            .then(() => {
-                alert(`'${metadata.name}' 세션에 성공적으로 참여했습니다!`);
-                joinSessionCodeInput.value = '';
-                sessionModal.classList.add('hidden');
-                handleSessionSwitch(code);
-            })
-            .catch(err => console.error("세션 참여 오류:", err));
+        if (currentUser) {
+            db.ref(`shared_sessions/${code}/members/${currentUser.uid}`).set(true);
+        }
+        finalizeJoin(code, metadata.name);
     });
 }
 
@@ -781,6 +796,11 @@ window.deletePlace = (id, name) => {
 };
 
 window.toggleLike = (id) => {
+    if (!currentUser && currentSessionType !== 'public') {
+        alert("공유 리스트에서 좋아요를 누르려면 로그인이 필요합니다. (전체 공유 리스트는 비로그인도 가능)");
+        return;
+    }
+
     const place = allPlaces.find(p => p.id === id);
     if (!place) return;
 
@@ -973,6 +993,11 @@ function displaySearchResults(results) {
 function savePlaceToFirebase(placeData) {
     if (typeof firebase === 'undefined') {
         alert("Firebase 설정이 완료되지 않았습니다. js/firebase-config.js를 확인하세요.");
+        return;
+    }
+
+    if (!currentUser && currentSessionType !== 'public') {
+        alert("공유 리스트에 장소를 추가하려면 로그인이 필요합니다. (전체 공유 리스트는 비로그인도 가능)");
         return;
     }
 
