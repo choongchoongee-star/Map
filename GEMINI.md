@@ -1,39 +1,67 @@
-# Real-time Collaborative Restaurant Map (Dangmoo Map)
+# 🥕 당무 지도 (Dangmoo Map) - 상세 기획서
 
-## Project Overview
-A web-based interactive map allowing small groups (<10 people) to search, add, and synchronize "Restaurant Places" in real-time. Changes made by one user are immediately reflected on all connected clients without page refreshes.
+## 1. 프로젝트 개요 (Project Overview)
+당무 지도는 소규모 그룹(10인 미만)이 실시간으로 맛집 정보를 공유하고 지형적 위치를 시각화할 수 있는 **실시간 협업 웹 맵 서비스**입니다. 사용자가 장소를 검색하고 리스트에 추가하면, 연결된 모든 클라이언트의 지도와 사이드바에 즉시 반영됩니다.
 
-## Tech Stack
-- **Frontend:** HTML5, CSS3 (Vanilla), JavaScript (ES6)
-- **Map Engine:** Naver Maps API JS V3
-- **Backend/Database:** Firebase Realtime Database (RTDB)
-- **SDKs:** Firebase Compat (v10.8.0)
+---
 
-## Core Features
-- **Dynamic Map:** Responsive Naver Map instance centered on Seoul.
-- **Real-time Sync:** `child_added` and `child_removed` listeners ensure state consistency across all users.
-- **Shared Sidebar:** Persistent list of added restaurants with metadata (category, who added).
-- **Responsive Design:** Mobile-optimized UI with toggleable sidebar and adaptive layouts.
-- **Focus Sync:** Clicking a sidebar item pans the map to the specific restaurant marker.
-- **Deep Linking:** Markers include mobile-optimized links to official Naver Map entries (cross-device compatibility).
+## 2. 기술 스택 (Tech Stack)
+### Frontend
+- **Language:** HTML5, CSS3 (Vanilla), JavaScript (ES6+)
+- **Map Engine:** Naver Maps JS API V3
+- **External Libraries:** Firebase Web SDK (v10.8.0 - Compat mode)
 
-## Data Schema (Firebase RTDB)
+### Backend (Serverless)
+- **Database:** Firebase Realtime Database (RTDB)
+- **Functions:** Firebase Cloud Functions v2 (Node.js 20)
+- **Search Proxy:** Axios 기반 Naver Local Search API 연동
+
+---
+
+## 3. 핵심 기능 상세 (Core Features)
+
+### 3.1. 실시간 데이터 동기화
+- **Firebase RTDB 연동:** `child_added`, `child_removed` 리스너를 사용하여 모든 사용자의 화면을 동기화.
+- **상태 관리:** 로컬 배열(`allPlaces`)에 장소 데이터를 유지하며 데이터 변경 시 UI를 즉시 재렌더링.
+
+### 3.2. 스마트 검색 및 장소 추가
+- **검색 프록시:** 브라우저 CORS 문제를 해결하기 위해 Firebase Cloud Functions을 통해 네이버 지역 검색 API 호출.
+- **지오코딩:** 검색 결과의 주소를 `naver.maps.Service.geocode`를 통해 좌표(Lat, Lng)로 변환하여 지도에 배치.
+- **결과 모달:** 검색 결과를 리스트로 보여주고, 선택 시 Firebase에 즉시 저장.
+
+### 3.3. 동적 사이드바 및 필터링
+- **페이지네이션:** 사이드바 리스트를 페이지당 10개씩 분할 표시.
+- **현재 지도 내 검색 (Bounds Filter):** 스위치 활성화 시, 현재 지도의 경계(Viewport) 안에 있는 장소만 사이드바 리스트에 노출.
+- **포커스 동기화:** 리스트 아이템 클릭 시 해당 위치로 지도 이동(panTo) 및 정보창(InfoWindow) 노출.
+
+### 3.4. 딥 링크 (App Handoff)
+- **네이버 지도 연동:** 상호명 기반의 네이버 지도 v5 검색 링크 제공.
+- **모바일 최적화:** 모바일 환경에서 클릭 시 네이버 지도 앱이 설치되어 있다면 앱으로 자동 연결되도록 `https://map.naver.com/v5/search/` 형식 사용.
+
+### 3.5. 반응형 UI/UX
+- **데스크톱:** 좌측 고정 사이드바와 우측 전체 지도 레이아웃.
+- **모바일:** 햄버거 메뉴를 통한 토글형 사이드바(화면의 80% 점유), 간소화된 헤더 디자인.
+
+---
+
+## 4. 데이터 스키마 (Data Schema)
+
+### Realtime Database 구조
 ```json
 {
   "shared_sessions": {
     "session_001": {
-      "metadata": {
-        "title": "Weekend Foodies",
-        "created_at": 1712345678
-      },
       "places": {
-        "auto_generated_id": {
-          "name": "열무밭에돈",
-          "address": "대구광역시 수성구 상동 321-6",
-          "category": "음식점 > 육류,고기요리",
-          "location": { "lat": 37.513, "lng": 127.034 },
-          "naver_url": "https://pcmap.place.naver.com/restaurant/12345",
-          "added_by": "User_Alpha"
+        "PLACE_ID": {
+          "name": "식당이름",
+          "address": "도로명 주소",
+          "category": "음식점 > 카페",
+          "location": {
+            "lat": 37.5665,
+            "lng": 126.9780
+          },
+          "naver_url": "https://map.naver.com/v5/search/...",
+          "added_by": "User_123"
         }
       }
     }
@@ -41,16 +69,17 @@ A web-based interactive map allowing small groups (<10 people) to search, add, a
 }
 ```
 
-## Credentials & Config
-- **Naver Client ID:** `3rh84i5w65`
-- **Firebase Project:** `dangmoo-map`
-- **Configuration File:** `js/firebase-config.js`
+---
 
-## Current Implementation Status
-- [x] Project scaffolding (HTML/CSS/JS)
-- [x] Naver Maps initialization
-- [x] Firebase RTDB integration
-- [x] Real-time markers and sidebar synchronization
-- [x] Responsive Design (Mobile Support)
-- [x] Mock search interface (Prototype)
-- [x] Production-ready Naver Local Search API (Firebase Cloud Functions Proxy)
+## 5. 보안 및 설정 (Security & Config)
+- **API Key 관리:** `js/firebase-config.js` 및 `functions/index.js`에 설정.
+- **검색 API:** 네이버 개발자 센터의 Client ID/Secret을 Cloud Functions 환경 변수 또는 코드 내에 설정.
+- **배포:** Firebase Hosting(Web), Firebase Functions(API)
+
+---
+
+## 6. 향후 과제 (Roadmap)
+- [ ] 사용자 커스텀 세션(방 만들기) 기능 추가
+- [ ] 카테고리별 마커 아이콘 차별화
+- [ ] 장소별 간단한 메모/리뷰 기능
+- [ ] 장소 중복 추가 방지 로직 고도화
