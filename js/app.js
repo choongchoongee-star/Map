@@ -64,6 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initAuthListener();
     
+    // Check for Join Link in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinCode = urlParams.get('join');
+    if (joinCode) {
+        // Delay slightly to ensure Firebase is ready
+        setTimeout(() => {
+            joinSharedSession(joinCode);
+            // Clean up URL without refreshing
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 1500);
+    }
+    
     // UI Events
     searchBtn.addEventListener('click', handleSearch);
     
@@ -356,11 +368,22 @@ function addSessionRowToModal(sessionId, name, isDefaultPrivate, isGuest = false
         </div>
         <div class="session-row-actions">
             <button class="action-btn-small copy-code-btn" onclick="copySessionCode('${sessionId}')">코드 복사</button>
+            <button class="action-btn-small invite-link-btn" onclick="copyInviteLink('${sessionId}')">링크 복사</button>
             ${!isDefaultPrivate ? `<button class="action-btn-small delete-session-btn" onclick="deleteSession('${sessionId}', '${name}', ${isGuest})">삭제</button>` : ''}
         </div>
     `;
     userSessionsList.appendChild(li);
 }
+
+window.copyInviteLink = (code) => {
+    const inviteUrl = `${window.location.origin}${window.location.pathname}?join=${code}`;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+        alert("초대 링크가 복사되었습니다. 이 링크를 친구에게 공유하세요!");
+    }).catch(err => {
+        console.error('링크 복사 실패:', err);
+        alert("초대 링크: " + inviteUrl);
+    });
+};
 
 window.copySessionCode = (code) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -476,8 +499,8 @@ function createSharedSession() {
         .catch(err => console.error("세션 생성 오류:", err));
 }
 
-function joinSharedSession() {
-    const code = joinSessionCodeInput.value.trim();
+function joinSharedSession(providedCode = null) {
+    const code = providedCode || joinSessionCodeInput.value.trim();
     if (!code) return alert("초대 코드를 입력하세요.");
 
     console.log("Attempting to join session:", code);
@@ -638,9 +661,13 @@ function addMarker(id, data) {
 
     const infoWindow = new naver.maps.InfoWindow({
         content: `
-            <div style="padding:10px; min-width:150px;">
+            <div style="padding:10px; min-width:180px;">
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
+                <div style="margin-top:8px; display:flex; gap:5px;">
+                    <a href="https://app.catchtable.co.kr/ct/search/integrated?keyword=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#ff3d00; color:white; text-decoration:none; border-radius:3px;">캐치테이블</a>
+                    <a href="https://m.booking.naver.com/booking/search?query=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#03c75a; color:white; text-decoration:none; border-radius:3px;">네이버 예약</a>
+                </div>
                 <div style="margin-top:8px;">
                     <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
                 </div>
@@ -788,6 +815,11 @@ function renderPlaceList(items) {
         const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
+        // Affiliate URLs (Search-based)
+        const catchtableUrl = `https://app.catchtable.co.kr/ct/search/integrated?keyword=${encodeURIComponent(place.name)}`;
+        const naverBookingUrl = `https://m.booking.naver.com/booking/search?query=${encodeURIComponent(place.name)}`;
+        const stayfolioUrl = `https://www.stayfolio.com/search?q=${encodeURIComponent(place.name)}`;
+
         const bookmarkIcon = `
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
@@ -803,6 +835,11 @@ function renderPlaceList(items) {
                     <div class="category">${place.category}</div>
                     <h4>${place.name}</h4>
                     <p>${place.address}</p>
+                    <div class="affiliate-links">
+                        <a href="${catchtableUrl}" target="_blank" class="aff-btn ct" title="캐치테이블">C</a>
+                        <a href="${naverBookingUrl}" target="_blank" class="aff-btn nb" title="네이버 예약">N</a>
+                        <a href="${stayfolioUrl}" target="_blank" class="aff-btn sf" title="스테이폴리오">S</a>
+                    </div>
                     <div class="place-actions">
                         <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="event.stopPropagation(); toggleLike('${place.id}')">
                             <span class="heart-icon">${isLiked ? '❤️' : '🤍'}</span>

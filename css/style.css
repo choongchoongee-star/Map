@@ -320,6 +320,34 @@ main {
 }
 
 /* Like Button Styling */
+/* Affiliate Links */
+.affiliate-links {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.aff-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    text-decoration: none;
+    color: white;
+}
+
+.aff-btn.ct { background: #ff3d00; } /* CatchTable Orange */
+.aff-btn.nb { background: #03c75a; } /* Naver Green */
+.aff-btn.sf { background: #2c3e50; } /* Stayfolio Dark */
+
+.aff-btn:hover {
+    opacity: 0.8;
+}
+
 .place-actions {
     display: flex;
     align-items: center;
