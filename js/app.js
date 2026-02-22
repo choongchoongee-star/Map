@@ -8,6 +8,7 @@ let markers = {};
 let infoWindows = {};
 let currentUser = null;
 let currentSessionId = 'session_001'; // Default: Public session
+let currentSessionType = 'public'; // 'public', 'private', 'shared'
 const PUBLIC_SESSION_ID = 'session_001';
 
 // Pagination & Filtering State
@@ -34,6 +35,14 @@ const sortSelect = document.getElementById('sort-select');
 const categorySelect = document.getElementById('category-select');
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
+const sessionSelect = document.getElementById('session-select');
+const manageSessionsBtn = document.getElementById('manage-sessions-btn');
+const sessionModal = document.getElementById('session-modal');
+const closeSessionModal = document.getElementById('close-session-modal');
+const newSessionNameInput = document.getElementById('new-session-name');
+const createSessionBtn = document.getElementById('create-session-btn');
+const joinSessionCodeInput = document.getElementById('join-session-code');
+const joinSessionBtn = document.getElementById('join-session-btn');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -55,6 +64,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auth Events
     loginBtn.addEventListener('click', handleGoogleLogin);
     logoutBtn.addEventListener('click', () => firebase.auth().signOut());
+
+    // Session Switching
+    sessionSelect.addEventListener('change', (e) => {
+        handleSessionSwitch(e.target.value);
+    });
+
+    manageSessionsBtn.addEventListener('click', () => {
+        if (!currentUser) return alert("세션 관리를 위해서는 로그인이 필요합니다.");
+        sessionModal.classList.remove('hidden');
+    });
+
+    closeSessionModal.addEventListener('click', () => {
+        sessionModal.classList.add('hidden');
+    });
+
+    createSessionBtn.addEventListener('click', createSharedSession);
+    joinSessionBtn.addEventListener('click', joinSharedSession);
 
     // Sidebar Toggle for Mobile
     menuToggle.addEventListener('click', () => {
@@ -124,23 +150,133 @@ function initAuthListener() {
 
     firebase.auth().onAuthStateChanged((user) => {
         currentUser = user;
+        updateSessionOptions(user);
+        
         if (user) {
-            // Logged In: Switch to personal session
-            currentSessionId = `private_${user.uid}`;
+            // Logged In: Switch to personal session by default
+            handleSessionSwitch(`private_${user.uid}`);
             usernameDisplay.textContent = user.displayName || '사용자';
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else {
             // Logged Out: Switch back to public session
-            currentSessionId = PUBLIC_SESSION_ID;
+            handleSessionSwitch(PUBLIC_SESSION_ID);
             usernameDisplay.textContent = '비로그인 사용자';
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
         }
-        
-        // Reset state and re-initialize listeners for the new session
-        clearExistingMapData();
-        initFirebaseListeners();
+    });
+}
+
+function updateSessionOptions(user) {
+    // Clear and add public session
+    sessionSelect.innerHTML = `<option value="${PUBLIC_SESSION_ID}">전체 공유 리스트</option>`;
+    
+    if (user) {
+        // Add private session
+        const privateOpt = document.createElement('option');
+        privateOpt.value = `private_${user.uid}`;
+        privateOpt.textContent = "내 개인 리스트";
+        sessionSelect.appendChild(privateOpt);
+
+        // Fetch shared sessions from user profile (metadata)
+        const db = firebase.database();
+        db.ref(`users/${user.uid}/sessions`).on('value', (snapshot) => {
+            const sessions = snapshot.val() || {};
+            // Refresh shared options (keep public/private)
+            sessionSelect.innerHTML = `<option value="${PUBLIC_SESSION_ID}">전체 공유 리스트</option>`;
+            sessionSelect.appendChild(privateOpt);
+            
+            Object.keys(sessions).forEach(sid => {
+                const opt = document.createElement('option');
+                opt.value = sid;
+                opt.textContent = sessions[sid].name || "친구와 공유된 리스트";
+                sessionSelect.appendChild(opt);
+            });
+
+            // Keep correct selection
+            sessionSelect.value = currentSessionId;
+        });
+    }
+}
+
+function handleSessionSwitch(sessionId) {
+    currentSessionId = sessionId;
+    
+    if (sessionId === PUBLIC_SESSION_ID) {
+        currentSessionType = 'public';
+    } else if (sessionId.startsWith('private_')) {
+        currentSessionType = 'private';
+    } else {
+        currentSessionType = 'shared';
+    }
+
+    sessionSelect.value = sessionId;
+    
+    // Reset state and re-initialize listeners
+    clearExistingMapData();
+    initFirebaseListeners();
+}
+
+function createSharedSession() {
+    if (!currentUser) return;
+    const name = newSessionNameInput.value.trim();
+    if (!name) return alert("세션 이름을 입력하세요.");
+
+    const db = firebase.database();
+    const sessionId = 'shared_' + Math.random().toString(36).substr(2, 9);
+    
+    const sessionData = {
+        metadata: {
+            name: name,
+            creator: currentUser.uid,
+            created_at: firebase.database.ServerValue.TIMESTAMP
+        },
+        members: {
+            [currentUser.uid]: true
+        }
+    };
+
+    // 1. Create the session
+    db.ref(`shared_sessions/${sessionId}`).set(sessionData)
+        .then(() => {
+            // 2. Add to user's list
+            return db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).set({ name: name });
+        })
+        .then(() => {
+            alert(`새 세션이 생성되었습니다! 초대 코드: ${sessionId}\n친구에게 이 코드를 공유하세요.`);
+            newSessionNameInput.value = '';
+            sessionModal.classList.add('hidden');
+            handleSessionSwitch(sessionId);
+        })
+        .catch(err => console.error("세션 생성 오류:", err));
+}
+
+function joinSharedSession() {
+    if (!currentUser) return;
+    const code = joinSessionCodeInput.value.trim();
+    if (!code) return alert("초대 코드를 입력하세요.");
+
+    const db = firebase.database();
+    
+    // 1. Check if session exists
+    db.ref(`shared_sessions/${code}/metadata`).once('value', (snapshot) => {
+        const metadata = snapshot.val();
+        if (!metadata) return alert("유효하지 않은 초대 코드입니다.");
+
+        // 2. Add user to session members
+        db.ref(`shared_sessions/${code}/members/${currentUser.uid}`).set(true)
+            .then(() => {
+                // 3. Add session to user's profile
+                return db.ref(`users/${currentUser.uid}/sessions/${code}`).set({ name: metadata.name });
+            })
+            .then(() => {
+                alert(`'${metadata.name}' 세션에 성공적으로 참여했습니다!`);
+                joinSessionCodeInput.value = '';
+                sessionModal.classList.add('hidden');
+                handleSessionSwitch(code);
+            })
+            .catch(err => console.error("세션 참여 오류:", err));
     });
 }
 
@@ -169,9 +305,15 @@ function initFirebaseListeners() {
     if (typeof firebase === 'undefined') return;
 
     const db = firebase.database();
-    const path = currentSessionId === PUBLIC_SESSION_ID 
-        ? `shared_sessions/${PUBLIC_SESSION_ID}/places`
-        : `user_sessions/${currentSessionId}/places`;
+    let path = '';
+    
+    if (currentSessionType === 'public') {
+        path = `shared_sessions/${PUBLIC_SESSION_ID}/places`;
+    } else if (currentSessionType === 'private') {
+        path = `user_sessions/${currentSessionId}/places`;
+    } else {
+        path = `shared_sessions/${currentSessionId}/places`;
+    }
         
     const placesRef = db.ref(path);
 
@@ -455,13 +597,15 @@ function renderPagination(totalPages) {
 
 // Global deletion function (to handle onclick from dynamic HTML)
 window.deletePlace = (id, name) => {
-    if (currentSessionId === PUBLIC_SESSION_ID) {
+    if (currentSessionType === 'public') {
         alert("전체 공유 리스트의 장소는 삭제할 수 없습니다.");
         return;
     }
     
     if(confirm(`'${name}'을(를) 삭제하시겠습니까?`)) {
-        const path = `user_sessions/${currentSessionId}/places/${id}`;
+        const path = currentSessionType === 'private'
+            ? `user_sessions/${currentSessionId}/places/${id}`
+            : `shared_sessions/${currentSessionId}/places/${id}`;
         firebase.database().ref(path).remove();
     }
 };
@@ -473,9 +617,14 @@ window.toggleLike = (id) => {
     const likes = place.likes || {};
     const userId = currentUser ? currentUser.uid : 'anon_' + Math.random().toString(36).substr(2, 5);
     
-    const path = currentSessionId === PUBLIC_SESSION_ID 
-        ? `shared_sessions/${PUBLIC_SESSION_ID}/places/${id}/likes/${userId}`
-        : `user_sessions/${currentSessionId}/places/${id}/likes/${userId}`;
+    let path = '';
+    if (currentSessionType === 'public') {
+        path = `shared_sessions/${PUBLIC_SESSION_ID}/places/${id}/likes/${userId}`;
+    } else if (currentSessionType === 'private') {
+        path = `user_sessions/${currentSessionId}/places/${id}/likes/${userId}`;
+    } else {
+        path = `shared_sessions/${currentSessionId}/places/${id}/likes/${userId}`;
+    }
 
     const ref = firebase.database().ref(path);
 
@@ -495,6 +644,8 @@ window.copyPlace = (id) => {
     const placeToCopy = allPlaces.find(p => p.id === id);
     if (!placeToCopy) return;
 
+    // By default, copy to the user's private session.
+    // In a more advanced version, we could show a modal to choose the target session.
     const targetSessionId = `private_${currentUser.uid}`;
     const targetPath = `user_sessions/${targetSessionId}/places`;
     const db = firebase.database();
@@ -519,7 +670,7 @@ window.copyPlace = (id) => {
             location: placeToCopy.location,
             naver_url: placeToCopy.naver_url,
             added_by: currentUser.displayName || currentUser.email,
-            copied_from: PUBLIC_SESSION_ID,
+            copied_from: currentSessionId,
             created_at: firebase.database.ServerValue.TIMESTAMP
         };
 
@@ -622,9 +773,15 @@ function savePlaceToFirebase(placeData) {
     }
 
     const db = firebase.database();
-    const path = currentSessionId === PUBLIC_SESSION_ID 
-        ? `shared_sessions/${PUBLIC_SESSION_ID}/places`
-        : `user_sessions/${currentSessionId}/places`;
+    let path = '';
+    
+    if (currentSessionType === 'public') {
+        path = `shared_sessions/${PUBLIC_SESSION_ID}/places`;
+    } else if (currentSessionType === 'private') {
+        path = `user_sessions/${currentSessionId}/places`;
+    } else {
+        path = `shared_sessions/${currentSessionId}/places`;
+    }
         
     const placesRef = db.ref(path);
     
