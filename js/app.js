@@ -124,8 +124,8 @@ function initFirebaseListeners() {
 
 // 5. UI Updates (Marker)
 function addMarker(id, data) {
-    // Force a reliable search-based URL (Restaurant Name Only)
-    const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(data.name)}`;
+    // Use mobile-optimized URL which redirects correctly on both PC and Mobile
+    const reliableNaverUrl = `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(data.name + ' ' + data.address)}`;
 
     const position = new naver.maps.LatLng(data.location.lat, data.location.lng);
     const marker = new naver.maps.Marker({
@@ -143,7 +143,7 @@ function addMarker(id, data) {
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
                 <div style="margin-top:8px;">
-                    <a href="${reliableNaverUrl}" target="_blank" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
+                    <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
                 </div>
             </div>
         `
@@ -206,7 +206,7 @@ function renderPlaceList(items) {
     }
 
     items.forEach(place => {
-        const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
+        const reliableNaverUrl = `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(place.name + ' ' + place.address)}`;
         const li = document.createElement('li');
         li.className = 'place-item';
         li.id = `sidebar-${place.id}`;
@@ -217,7 +217,7 @@ function renderPlaceList(items) {
                     <h4>${place.name}</h4>
                     <p>${place.address}</p>
                     <div style="margin-bottom: 5px;">
-                        <a href="${reliableNaverUrl}" target="_blank" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
+                        <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
                     </div>
                 </div>
                 <button class="delete-btn" title="삭제" onclick="deletePlace('${place.id}', '${place.name}')">×</button>
@@ -313,8 +313,8 @@ async function handleSearch() {
                     address: searchAddress,
                     category: item.category,
                     location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
-                    // Save as base search URL but name-only
-                    naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
+                    // Save as mobile-optimized search URL
+                    naver_url: `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(cleanTitle + ' ' + searchAddress)}`,
                     added_by: USERNAME
                 });
             }
