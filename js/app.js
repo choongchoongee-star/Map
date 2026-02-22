@@ -696,6 +696,12 @@ function renderPlaceList(items) {
         const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
+        const bookmarkIcon = `
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+            </svg>
+        `;
+
         const li = document.createElement('li');
         li.className = 'place-item';
         li.id = `sidebar-${place.id}`;
@@ -712,7 +718,7 @@ function renderPlaceList(items) {
                         </button>
                         ${showSaveBtn ? `
                         <button class="save-to-my-btn ${isSaved ? 'is-saved' : ''}" onclick="event.stopPropagation(); copyPlace('${place.id}')" title="내 리스트에 저장">
-                            ${isSaved ? '🔖' : '📑'}
+                            ${bookmarkIcon}
                         </button>
                         ` : ''}
                         <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>

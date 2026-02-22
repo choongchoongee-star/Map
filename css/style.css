@@ -347,23 +347,25 @@ main {
 .save-to-my-btn {
     background: none;
     border: none;
-    color: #007bff;
+    color: #bdc3c7; /* Light gray for unsaved */
     padding: 2px 4px;
-    font-size: 1.1rem;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.2s, color 0.2s;
     display: flex;
     align-items: center;
 }
 
 .save-to-my-btn:hover {
-    transform: scale(1.2);
-    background: none;
-    color: #0056b3;
+    transform: scale(1.15);
+    color: #95a5a6;
 }
 
 .save-to-my-btn.is-saved {
     color: #f1c40f; /* Gold for saved bookmark */
+}
+
+.save-to-my-btn svg {
+    display: block;
 }
 
 .like-btn:hover {
