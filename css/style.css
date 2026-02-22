@@ -320,48 +320,10 @@ main {
 }
 
 /* Like Button Styling */
-/* Affiliate Links */
-.affiliate-container {
-    margin-bottom: 8px;
-}
-
-.affiliate-links {
-    display: flex;
-    gap: 6px;
-}
-
 .sidebar-footer {
     margin-top: 20px;
     padding-top: 15px;
     border-top: 1px solid #eee;
-}
-
-.aff-global-notice {
-    font-size: 11px;
-    color: #999;
-    line-height: 1.4;
-    text-align: center;
-}
-
-.aff-btn {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: bold;
-    text-decoration: none;
-    color: white;
-}
-
-.aff-btn.ct { background: #ff3d00; } /* CatchTable Orange */
-.aff-btn.nb { background: #03c75a; } /* Naver Green */
-.aff-btn.sf { background: #2c3e50; } /* Stayfolio Dark */
-
-.aff-btn:hover {
-    opacity: 0.8;
 }
 
 .place-actions {

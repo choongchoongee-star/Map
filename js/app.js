@@ -659,19 +659,11 @@ function addMarker(id, data) {
 
     markers[id] = marker;
 
-    const cat = (data.category || '').toLowerCase();
-    const canBook = cat.includes('음식점') || cat.includes('식당') || cat.includes('카페') || cat.includes('숙박') || cat.includes('미용') || cat.includes('요리');
-
     const infoWindow = new naver.maps.InfoWindow({
         content: `
-            <div style="padding:10px; min-width:180px;">
+            <div style="padding:10px; min-width:150px;">
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
-                <div style="margin-top:8px;">
-                    <div style="display:flex; gap:5px;">
-                        ${canBook ? `<a href="https://m.booking.naver.com/booking/search?query=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 8px; background:#03c75a; color:white; text-decoration:none; border-radius:3px; font-weight:bold;">네이버 예약</a>` : ''}
-                    </div>
-                </div>
                 <div style="margin-top:8px;">
                     <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" style="font-size:12px; color:#27ae60; text-decoration:none; font-weight:bold;">네이버 지도로 보기</a>
                 </div>
@@ -819,12 +811,6 @@ function renderPlaceList(items) {
         const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
-        // Smart Affiliate Logic: Only show Naver Booking for relevant categories
-        const cat = (place.category || '').toLowerCase();
-        const canBook = cat.includes('음식점') || cat.includes('식당') || cat.includes('카페') || cat.includes('숙박') || cat.includes('미용') || cat.includes('요리');
-
-        const naverBookingUrl = `https://m.booking.naver.com/booking/search?query=${encodeURIComponent(place.name)}`;
-
         const bookmarkIcon = `
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
@@ -840,11 +826,6 @@ function renderPlaceList(items) {
                     <div class="category">${place.category}</div>
                     <h4>${place.name}</h4>
                     <p>${place.address}</p>
-                    <div class="affiliate-container">
-                        <div class="affiliate-links">
-                            ${canBook ? `<a href="${naverBookingUrl}" target="_blank" class="aff-btn nb" style="width:auto; padding:0 8px;" title="네이버 예약 확인">N 네이버 예약</a>` : ''}
-                        </div>
-                    </div>
                     <div class="place-actions">
                         <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="event.stopPropagation(); toggleLike('${place.id}')">
                             <span class="heart-icon">${isLiked ? '❤️' : '🤍'}</span>
