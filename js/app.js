@@ -354,17 +354,38 @@ function deleteSession(sessionId, name, isGuest = false) {
 
     if (!currentUser) return;
     const db = firebase.database();
-    db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove()
-        .then(() => {
-            if (sessionId.startsWith('shared_')) {
-                return db.ref(`shared_sessions/${sessionId}/members/${currentUser.uid}`).remove();
+    
+    // 1. Check if user is the creator (for shared sessions)
+    if (sessionId.startsWith('shared_')) {
+        db.ref(`shared_sessions/${sessionId}/metadata/creator`).once('value', (snapshot) => {
+            const creatorUid = snapshot.val();
+            if (creatorUid === currentUser.uid) {
+                // User IS creator: Fully delete shared session
+                if (confirm("귀하는 이 목록의 생성자입니다. 목록을 완전히 삭제하시겠습니까? (모든 참여자의 화면에서 사라집니다)")) {
+                    db.ref(`shared_sessions/${sessionId}`).remove();
+                    // Cleanup user's reference too
+                    db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove();
+                    finalizeDelete(sessionId, name);
+                }
+            } else {
+                // User IS NOT creator: Just leave/remove from own profile
+                db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove();
+                db.ref(`shared_sessions/${sessionId}/members/${currentUser.uid}`).remove();
+                finalizeDelete(sessionId, name);
             }
-        })
-        .then(() => {
-            if (currentSessionId === sessionId) handleSessionSwitch(PUBLIC_SESSION_ID);
-            alert(`'${name}' 목록이 삭제되었습니다.`);
-        })
-        .catch(err => console.error("세션 삭제 오류:", err));
+        });
+    } else {
+        // Private sessions: Just remove from profile (owner is implied)
+        db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove();
+        finalizeDelete(sessionId, name);
+    }
+}
+
+function finalizeDelete(sessionId, name) {
+    if (currentSessionId === sessionId) {
+        handleSessionSwitch(PUBLIC_SESSION_ID);
+    }
+    alert(`'${name}' 목록이 처리되었습니다.`);
 }
 
 function handleSessionSwitch(sessionId) {

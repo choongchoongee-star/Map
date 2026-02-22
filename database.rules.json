@@ -5,7 +5,6 @@
         "places": {
           ".read": true,
           "$place_id": {
-            // Allow adding (create) and updating (e.g., likes), but block deletion (newData.exists())
             ".write": "newData.exists()",
             ".validate": "newData.hasChildren(['name', 'address', 'location'])"
           }
@@ -16,26 +15,28 @@
         }
       },
       "$shared_id": {
-        // Anyone with the code can read (Guest view and Joining check)
         ".read": true,
-        ".write": "auth != null && (!data.exists() || data.child('members').child(auth.uid).exists() || newData.child('members').child(auth.uid).exists())",
+        // Only creator can delete the whole session object (null write)
+        // Participants can only write to their members entry (via users/ rules) or add places
+        ".write": "auth != null && (!data.exists() || data.child('metadata/creator').val() == auth.uid || (data.exists() && newData.exists() && data.child('members').child(auth.uid).exists()))",
         "places": {
-          // Only members can add/delete in shared sessions
           ".write": "auth != null && root.child('shared_sessions').child($shared_id).child('members').child(auth.uid).exists()"
+        },
+        "members": {
+          "$uid": {
+            ".write": "auth != null && (auth.uid == $uid || data.parent().parent().child('metadata/creator').val() == auth.uid)"
+          }
         }
       }
     },
     "user_sessions": {
       "$private_id": {
-        // Anyone with the code can read (Sharing/Viewing)
         ".read": true,
-        // ONLY the owner can write (add/delete/edit)
         ".write": "auth != null && $private_id == 'private_' + auth.uid"
       }
     },
     "users": {
       "$uid": {
-        // Only the user can manage their own session list
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
       }
