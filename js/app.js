@@ -62,6 +62,15 @@ let placeToCopyData = null;
 let userSessionsCache = {}; // Cache of user's session names
 let savedPlacesMap = {}; // Map of name+address to boolean
 let guestSessions = JSON.parse(localStorage.getItem('guestSessions')) || {}; // { id: name }
+let anonId = localStorage.getItem('persistentAnonId');
+if (!anonId) {
+    anonId = 'anon_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('persistentAnonId', anonId);
+}
+
+function getUserId() {
+    return currentUser ? currentUser.uid : anonId;
+}
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -813,7 +822,7 @@ function renderPlaceList(items) {
         const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
         const likes = place.likes || {};
         const likeCount = Object.keys(likes).length;
-        const userId = currentUser ? currentUser.uid : 'anon';
+        const userId = getUserId();
         const isLiked = !!likes[userId];
         const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
@@ -952,7 +961,7 @@ window.toggleLike = (id) => {
     if (!place) return;
 
     const likes = place.likes || {};
-    const userId = currentUser ? currentUser.uid : 'anon_' + Math.random().toString(36).substr(2, 5);
+    const userId = getUserId();
     
     let path = '';
     if (currentSessionType === 'public') {
