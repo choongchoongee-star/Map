@@ -44,6 +44,7 @@ const createSessionBtn = document.getElementById('create-session-btn');
 const joinSessionCodeInput = document.getElementById('join-session-code');
 const joinSessionBtn = document.getElementById('join-session-btn');
 const userSessionsList = document.getElementById('user-sessions-list');
+const createSessionGroup = document.getElementById('create-session-group');
 const saveTargetModal = document.getElementById('save-target-modal');
 const targetSessionsList = document.getElementById('target-sessions-list');
 const confirmSaveBtn = document.getElementById('confirm-save-btn');
@@ -176,17 +177,19 @@ function initAuthListener() {
         updateSessionOptions(user);
         
         if (user) {
-            // Logged In: Switch to personal session by default
+            // Logged In
             handleSessionSwitch(`private_${user.uid}`);
             usernameDisplay.textContent = user.displayName || '사용자';
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
+            if (createSessionGroup) createSessionGroup.classList.remove('hidden');
         } else {
-            // Logged Out: Switch back to public session
+            // Logged Out
             handleSessionSwitch(PUBLIC_SESSION_ID);
             usernameDisplay.textContent = '비로그인 사용자';
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
+            if (createSessionGroup) createSessionGroup.classList.add('hidden');
         }
     });
 }
@@ -420,41 +423,58 @@ function joinSharedSession() {
     const code = joinSessionCodeInput.value.trim();
     if (!code) return alert("초대 코드를 입력하세요.");
 
+    console.log("Attempting to join session:", code);
     const db = firebase.database();
     
+    // Success handler
     const finalizeJoin = (sid, name) => {
+        console.log("Successfully joined:", sid, name);
         guestSessions[sid] = name;
         localStorage.setItem('guestSessions', JSON.stringify(guestSessions));
         
         if (currentUser) {
-            // Also sync to user profile if logged in
             db.ref(`users/${currentUser.uid}/sessions/${sid}`).set({ name: name });
         }
         
         alert(`'${name}' 목록에 성공적으로 참여했습니다!`);
         joinSessionCodeInput.value = '';
         sessionModal.classList.add('hidden');
+        
+        // Switch to the new session
         handleSessionSwitch(sid);
+        // Refresh the switcher options
         updateSessionOptions(currentUser);
     };
 
-    // Logic to handle both shared_ and private_ sessions
+    // 1. Private session check
     if (code.startsWith('private_')) {
         db.ref(`user_sessions/${code}`).once('value', (snapshot) => {
-            if (!snapshot.exists()) return alert("유효하지 않은 초대 코드입니다.");
-            finalizeJoin(code, "공유받은 개인 리스트");
+            if (snapshot.exists()) {
+                finalizeJoin(code, "공유받은 개인 리스트");
+            } else {
+                alert("유효하지 않은 초대 코드입니다. (해당 개인 리스트를 찾을 수 없음)");
+            }
+        }).catch(err => {
+            console.error("Join error (private):", err);
+            alert("참여 중 오류가 발생했습니다. (권한 문제일 수 있습니다)");
         });
         return;
     }
 
+    // 2. Shared session check
     db.ref(`shared_sessions/${code}/metadata`).once('value', (snapshot) => {
         const metadata = snapshot.val();
-        if (!metadata) return alert("유효하지 않은 초대 코드입니다.");
-
-        if (currentUser) {
-            db.ref(`shared_sessions/${code}/members/${currentUser.uid}`).set(true);
+        if (metadata) {
+            if (currentUser) {
+                db.ref(`shared_sessions/${code}/members/${currentUser.uid}`).set(true);
+            }
+            finalizeJoin(code, metadata.name);
+        } else {
+            alert("유효하지 않은 초대 코드입니다. (세션이 존재하지 않음)");
         }
-        finalizeJoin(code, metadata.name);
+    }).catch(err => {
+        console.error("Join error (shared):", err);
+        alert("참여 중 오류가 발생했습니다. (권한 문제일 수 있습니다)");
     });
 }
 
