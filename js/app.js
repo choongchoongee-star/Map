@@ -126,10 +126,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (isActive) {
             sidebar.classList.add('active');
-            if (mobileListFab) mobileListFab.classList.add('hidden');
+            if (mobileListFab) {
+                mobileListFab.style.display = 'none'; // Use style for absolute control
+                mobileListFab.classList.add('hidden');
+            }
         } else {
             sidebar.classList.remove('active');
-            if (mobileListFab) mobileListFab.classList.remove('hidden');
+            if (mobileListFab && window.innerWidth <= 768) {
+                mobileListFab.style.display = 'block';
+                mobileListFab.classList.remove('hidden');
+            }
         }
     }
 

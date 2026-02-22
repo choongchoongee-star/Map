@@ -538,8 +538,8 @@ input:checked + .slider:before {
         display: block;
     }
 
-    .user-info {
-        display: none; /* Hide username on small screens to save space */
+    .user-info #username-display {
+        display: none; /* Hide only username on mobile, keep buttons */
     }
 
     .search-container {
