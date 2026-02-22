@@ -574,19 +574,24 @@ input:checked + .slider:before {
     .mobile-only-fab {
         display: block;
         position: absolute;
-        bottom: 20px;
+        bottom: 30px; /* Slightly higher */
         left: 50%;
         transform: translateX(-50%);
-        z-index: 400;
+        z-index: 10000; /* Very high to stay above Map controls */
         padding: 12px 24px;
         background: #2c3e50;
         color: white;
         border: none;
         border-radius: 30px;
         font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         cursor: pointer;
         white-space: nowrap;
+        transition: transform 0.2s, opacity 0.2s;
+    }
+
+    .mobile-only-fab:active {
+        transform: translateX(-50%) scale(0.95);
     }
 
     .mobile-only-fab.hidden {

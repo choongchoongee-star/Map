@@ -136,6 +136,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Export toggleSidebar for other functions
     window.appToggleSidebar = toggleSidebar;
 
+    // Initialize mobile UI state
+    if (window.innerWidth <= 768) {
+        toggleSidebar(false);
+    }
+
     // Map filter toggle
     if (filterVisibleCheckbox) {
         filterVisibleCheckbox.addEventListener('change', (e) => {
