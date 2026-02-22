@@ -14,6 +14,7 @@ let allPlaces = [];
 let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
 let filterVisibleOnly = false;
+let sortOrder = 'date'; // Default: date, others: likes, distance
 
 // DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -27,6 +28,7 @@ const sidebar = document.getElementById('sidebar');
 const menuToggle = document.getElementById('menu-toggle');
 const filterVisibleCheckbox = document.getElementById('filter-visible');
 const paginationContainer = document.getElementById('pagination');
+const sortSelect = document.getElementById('sort-select');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -59,6 +61,21 @@ document.addEventListener('DOMContentLoaded', () => {
             updateSidebarDisplay();
         });
     }
+
+    if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            sortOrder = e.target.value;
+            currentPage = 1;
+            updateSidebarDisplay();
+        });
+    }
+
+    // Update distances when map moves (if distance sort is active)
+    naver.maps.Event.addListener(map, 'dragend', () => {
+        if (sortOrder === 'distance') {
+            updateSidebarDisplay();
+        }
+    });
 });
 
 // 3. Map Logic
@@ -105,6 +122,19 @@ function initFirebaseListeners() {
         
         // Update sidebar
         updateSidebarDisplay();
+    });
+
+    // Listen for changes (like updates)
+    placesRef.on('child_changed', (snapshot) => {
+        const placeId = snapshot.key;
+        const placeData = snapshot.val();
+        
+        // Update local state
+        const idx = allPlaces.findIndex(p => p.id === placeId);
+        if (idx !== -1) {
+            allPlaces[idx] = { id: placeId, ...placeData };
+            updateSidebarDisplay();
+        }
     });
 
     // Listen for deletions
@@ -169,7 +199,7 @@ function removeMarkerFromUI(id) {
     }
 }
 
-// Sidebar Display Update (Filtering & Pagination)
+// Sidebar Display Update (Filtering, Sorting & Pagination)
 function updateSidebarDisplay() {
     let filtered = [...allPlaces];
     
@@ -180,6 +210,26 @@ function updateSidebarDisplay() {
             const pos = new naver.maps.LatLng(place.location.lat, place.location.lng);
             return bounds.hasLatLng(pos);
         });
+    }
+
+    // Sorting Logic
+    if (sortOrder === 'likes') {
+        filtered.sort((a, b) => {
+            const aLikes = a.likes ? Object.keys(a.likes).length : 0;
+            const bLikes = b.likes ? Object.keys(b.likes).length : 0;
+            return bLikes - aLikes; // Descending
+        });
+    } else if (sortOrder === 'distance' && map) {
+        const center = map.getCenter();
+        filtered.sort((a, b) => {
+            const distA = getDistance(center.lat(), center.lng(), a.location.lat, a.location.lng);
+            const distB = getDistance(center.lat(), center.lng(), b.location.lat, b.location.lng);
+            return distA - distB; // Ascending
+        });
+    } else if (sortOrder === 'date') {
+        // Assume later ID or index means newer if no timestamp, 
+        // but let's reverse the array for 'latest' behavior
+        filtered.reverse();
     }
 
     // Pagination logic
@@ -197,6 +247,19 @@ function updateSidebarDisplay() {
     renderPagination(totalPages);
 }
 
+// Distance calculation (Haversine formula)
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
 function renderPlaceList(items) {
     placeList.innerHTML = '';
     
@@ -207,6 +270,10 @@ function renderPlaceList(items) {
 
     items.forEach(place => {
         const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
+        const likes = place.likes || {};
+        const likeCount = Object.keys(likes).length;
+        const isLiked = !!likes[USERNAME];
+
         const li = document.createElement('li');
         li.className = 'place-item';
         li.id = `sidebar-${place.id}`;
@@ -216,7 +283,11 @@ function renderPlaceList(items) {
                     <div class="category">${place.category}</div>
                     <h4>${place.name}</h4>
                     <p>${place.address}</p>
-                    <div style="margin-bottom: 5px;">
+                    <div class="place-actions">
+                        <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="event.stopPropagation(); toggleLike('${place.id}')">
+                            <span class="heart-icon">${isLiked ? '❤️' : '🤍'}</span>
+                            <span class="like-count">${likeCount}</span>
+                        </button>
                         <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
                     </div>
                 </div>
@@ -265,6 +336,20 @@ function renderPagination(totalPages) {
 window.deletePlace = (id, name) => {
     if(confirm(`'${name}'을(를) 삭제하시겠습니까?`)) {
         firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
+    }
+};
+
+window.toggleLike = (id) => {
+    const place = allPlaces.find(p => p.id === id);
+    if (!place) return;
+
+    const likes = place.likes || {};
+    const ref = firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}/likes/${USERNAME}`);
+
+    if (likes[USERNAME]) {
+        ref.remove();
+    } else {
+        ref.set(true);
     }
 };
 
