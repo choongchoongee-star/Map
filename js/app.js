@@ -49,6 +49,7 @@ const saveTargetModal = document.getElementById('save-target-modal');
 const targetSessionsList = document.getElementById('target-sessions-list');
 const confirmSaveBtn = document.getElementById('confirm-save-btn');
 const closeSaveModal = document.getElementById('close-save-modal');
+const mobileListFab = document.getElementById('mobile-list-fab');
 
 // Global state for copying
 let lastTargetSessionId = localStorage.getItem('lastTargetSessionId') || null;
@@ -106,10 +107,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Mobile UI Events
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => {
+            toggleSidebar();
+        });
+    }
+
+    if (mobileListFab) {
+        mobileListFab.addEventListener('click', () => {
+            toggleSidebar(true);
+        });
+    }
+
     // Sidebar Toggle for Mobile
-    menuToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('active');
-    });
+    function toggleSidebar(forceOpen = null) {
+        const isActive = forceOpen !== null ? forceOpen : !sidebar.classList.contains('active');
+        
+        if (isActive) {
+            sidebar.classList.add('active');
+            if (mobileListFab) mobileListFab.classList.add('hidden');
+        } else {
+            sidebar.classList.remove('active');
+            if (mobileListFab) mobileListFab.classList.remove('hidden');
+        }
+    }
+
+    // Export toggleSidebar for other functions
+    window.appToggleSidebar = toggleSidebar;
+});
 
     // Map filter toggle
     if (filterVisibleCheckbox) {
@@ -155,7 +181,7 @@ function initMap() {
     // Close sidebar on mobile when map is clicked
     naver.maps.Event.addListener(map, 'click', () => {
         if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
-            sidebar.classList.remove('active');
+            if (window.appToggleSidebar) window.appToggleSidebar(false);
         }
     });
 
@@ -795,7 +821,7 @@ function renderPlaceList(items) {
             if (infoWindows[place.id]) infoWindows[place.id].open(map, markers[place.id]);
             
             if (window.innerWidth <= 768) {
-                sidebar.classList.remove('active');
+                if (window.appToggleSidebar) window.appToggleSidebar(false);
             }
         });
 
