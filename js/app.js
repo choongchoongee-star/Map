@@ -135,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Export toggleSidebar for other functions
     window.appToggleSidebar = toggleSidebar;
-});
 
     // Map filter toggle
     if (filterVisibleCheckbox) {
