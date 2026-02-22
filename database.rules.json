@@ -1,0 +1,44 @@
+{
+  "rules": {
+    "shared_sessions": {
+      "session_001": {
+        "places": {
+          ".read": true,
+          ".write": "auth != null",
+          "$place_id": {
+            ".validate": "newData.hasChildren(['name', 'address', 'location'])",
+            // Public list: No deletion allowed (only allow adding)
+            ".write": "auth != null && !data.exists()"
+          }
+        },
+        // Allow adding likes but not deleting the place
+        "likes": {
+          ".read": true,
+          ".write": "auth != null"
+        }
+      },
+      "$shared_id": {
+        ".read": "auth != null && data.child('members').child(auth.uid).exists()",
+        ".write": "auth != null && (!data.exists() || data.child('members').child(auth.uid).exists())",
+        "places": {
+          ".read": "auth != null && root.child('shared_sessions').child($shared_id).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('shared_sessions').child($shared_id).child('members').child(auth.uid).exists()"
+        }
+      }
+    },
+    "user_sessions": {
+      "$private_id": {
+        // Only owner can read/write their private session
+        ".read": "auth != null && $private_id == 'private_' + auth.uid",
+        ".write": "auth != null && $private_id == 'private_' + auth.uid"
+      }
+    },
+    "users": {
+      "$uid": {
+        // Only the user can see their session list
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
