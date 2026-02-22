@@ -45,6 +45,10 @@ const joinSessionCodeInput = document.getElementById('join-session-code');
 const joinSessionBtn = document.getElementById('join-session-btn');
 const userSessionsList = document.getElementById('user-sessions-list');
 const createSessionGroup = document.getElementById('create-session-group');
+const batchAddGroup = document.getElementById('batch-add-group');
+const batchAddInput = document.getElementById('batch-add-input');
+const batchAddBtn = document.getElementById('batch-add-btn');
+const batchProgress = document.getElementById('batch-progress');
 const saveTargetModal = document.getElementById('save-target-modal');
 const targetSessionsList = document.getElementById('target-sessions-list');
 const confirmSaveBtn = document.getElementById('confirm-save-btn');
@@ -107,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     createSessionBtn.addEventListener('click', createSharedSession);
     joinSessionBtn.addEventListener('click', joinSharedSession);
+    batchAddBtn.addEventListener('click', handleBatchAdd);
 
     // Save Modal Events
     closeSaveModal.addEventListener('click', () => {
@@ -231,6 +236,7 @@ function initAuthListener() {
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
             if (createSessionGroup) createSessionGroup.classList.remove('hidden');
+            if (batchAddGroup) batchAddGroup.classList.remove('hidden');
         } else {
             // Logged Out
             handleSessionSwitch(PUBLIC_SESSION_ID);
@@ -238,6 +244,7 @@ function initAuthListener() {
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
             if (createSessionGroup) createSessionGroup.classList.add('hidden');
+            if (batchAddGroup) batchAddGroup.classList.add('hidden');
         }
     });
 }
@@ -1012,6 +1019,96 @@ function executeCopyPlace(targetSessionId, placeData) {
             })
             .catch(err => console.error("복사 오류:", err));
     });
+}
+
+async function handleBatchAdd() {
+    if (!currentUser) return alert("로그인이 필요합니다.");
+    const input = batchAddInput.value.trim();
+    if (!input) return alert("추가할 장소 목록을 입력하세요.");
+
+    const names = input.split('\n').map(n => n.trim()).filter(n => n !== '');
+    if (names.length === 0) return;
+
+    if (!confirm(`${names.length}개의 장소를 현재 목록('${userSessionsCache[currentSessionId]}')에 추가하시겠습니까?\n(API 과부하 방지를 위해 약 ${Math.ceil(names.length * 1.5)}초가 소요됩니다)`)) return;
+
+    batchAddBtn.disabled = true;
+    batchAddBtn.textContent = '처리 중...';
+    batchProgress.classList.remove('hidden');
+
+    for (let i = 0; i < names.length; i++) {
+        batchProgress.textContent = `진행 중: ${i + 1} / ${names.length} (${names[i]})`;
+        
+        try {
+            await processSinglePlaceForBatch(names[i]);
+        } catch (err) {
+            console.error(`Error adding ${names[i]}:`, err);
+        }
+
+        // Delay 1.5s between items to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    alert('대량 추가가 완료되었습니다!');
+    batchAddBtn.disabled = false;
+    batchAddBtn.textContent = '대량 추가 시작';
+    batchAddInput.value = '';
+    batchProgress.classList.add('hidden');
+}
+
+async function processSinglePlaceForBatch(query) {
+    // 1. Search Naver
+    const functionUrl = `https://us-central1-dangmoo-map.cloudfunctions.net/naverSearch?query=${encodeURIComponent(query)}`;
+    const response = await fetch(functionUrl);
+    if (!response.ok) return;
+
+    const data = await response.json();
+    const items = data.items;
+    if (!items || items.length === 0) return;
+
+    const item = items[0]; // Take the most relevant one
+    const cleanTitle = item.title.replace(/<[^>]*>?/gm, '');
+
+    // 2. Geocode
+    const geoResult = await new Promise((resolve) => {
+        naver.maps.Service.geocode({ query: item.roadAddress || item.address }, (status, res) => {
+            if (status === naver.maps.Service.Status.OK && res.v2.addresses.length > 0) {
+                resolve(res.v2.addresses[0]);
+            } else {
+                resolve(null);
+            }
+        });
+    });
+
+    if (!geoResult) return;
+
+    // 3. Save to Firebase
+    const placeData = {
+        name: cleanTitle,
+        address: item.roadAddress || item.address,
+        category: item.category,
+        location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
+        naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
+        added_by: currentUser.displayName || currentUser.email,
+        created_at: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    // Use existing duplicate logic implicitly or just push
+    const isDuplicate = allPlaces.some(p => 
+        p.name === placeData.name && p.address === placeData.address
+    );
+
+    if (!isDuplicate) {
+        const db = firebase.database();
+        let path = '';
+        if (currentSessionType === 'public') {
+            path = `shared_sessions/${PUBLIC_SESSION_ID}/places`;
+        } else if (currentSessionType === 'private') {
+            path = `user_sessions/${currentSessionId}/places`;
+        } else {
+            path = `shared_sessions/${currentSessionId}/places`;
+        }
+        await db.ref(path).push(placeData);
+    }
 }
 
 // 6. Search & Persistence Logic

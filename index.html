@@ -108,6 +108,14 @@
                             <button id="join-session-btn">참여</button>
                         </div>
                     </div>
+                    <hr>
+                    <div class="action-group" id="batch-add-group">
+                        <h4>대량 장소 추가 (로그인 필요)</h4>
+                        <p class="filter-label">한 줄에 하나씩 장소명을 입력하세요.</p>
+                        <textarea id="batch-add-input" rows="5" placeholder="예시:&#10;가보정&#10;몽탄&#10;금돼지식당" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:0.85rem;"></textarea>
+                        <button id="batch-add-btn" style="background:#27ae60;">대량 추가 시작</button>
+                        <div id="batch-progress" class="filter-label hidden" style="color:#27ae60; font-weight:bold;">진행 중: 0 / 0</div>
+                    </div>
                 </div>
                 <button id="close-session-modal">닫기</button>
             </div>
