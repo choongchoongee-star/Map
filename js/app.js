@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModal.addEventListener('click', () => resultsModal.classList.add('hidden'));
 
     // Auth Events
-    loginBtn.addEventListener('click', handleNaverLogin);
+    loginBtn.addEventListener('click', handleGoogleLogin);
     logoutBtn.addEventListener('click', () => firebase.auth().signOut());
 
     // Sidebar Toggle for Mobile
@@ -144,14 +144,16 @@ function initAuthListener() {
     });
 }
 
-function handleNaverLogin() {
-    // Note: Naver login requires Firebase Console setup for 'OpenID Connect' or 'Generic OAuth'
-    // This is a placeholder for the logic; users need to configure the provider first.
-    alert("네이버 로그인은 Firebase Console에서 'Generic OAuth'를 설정해야 활성화됩니다. 현재는 개발 모드로 동작합니다.");
-    
-    // Temporary: Simulating login with an anonymous or custom user for testing phase
-    firebase.auth().signInAnonymously()
-        .catch(err => console.error("Login Error:", err));
+function handleGoogleLogin() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+            console.log("Login Success:", result.user.displayName);
+        })
+        .catch(err => {
+            console.error("Login Error:", err);
+            alert("로그인 중 오류가 발생했습니다: " + err.message);
+        });
 }
 
 function clearExistingMapData() {
