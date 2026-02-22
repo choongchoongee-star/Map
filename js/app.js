@@ -6,8 +6,9 @@
 let map;
 let markers = {};
 let infoWindows = {};
-const USERNAME = 'User_' + Math.floor(Math.random() * 1000);
-const SESSION_ID = 'session_001'; // Default session
+let currentUser = null;
+let currentSessionId = 'session_001'; // Default: Public session
+const PUBLIC_SESSION_ID = 'session_001';
 
 // Pagination & Filtering State
 let allPlaces = []; 
@@ -31,12 +32,13 @@ const filterVisibleCheckbox = document.getElementById('filter-visible');
 const paginationContainer = document.getElementById('pagination');
 const sortSelect = document.getElementById('sort-select');
 const categorySelect = document.getElementById('category-select');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
-    initFirebaseListeners();
-    usernameDisplay.textContent = `접속자: ${USERNAME}`;
+    initAuthListener();
     
     // UI Events
     searchBtn.addEventListener('click', handleSearch);
@@ -49,6 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     closeModal.addEventListener('click', () => resultsModal.classList.add('hidden'));
+
+    // Auth Events
+    loginBtn.addEventListener('click', handleNaverLogin);
+    logoutBtn.addEventListener('click', () => firebase.auth().signOut());
 
     // Sidebar Toggle for Mobile
     menuToggle.addEventListener('click', () => {
@@ -113,11 +119,62 @@ function initMap() {
 }
 
 // 4. Firebase Logic (Real-time Sync)
+function initAuthListener() {
+    if (typeof firebase === 'undefined') return;
+
+    firebase.auth().onAuthStateChanged((user) => {
+        currentUser = user;
+        if (user) {
+            // Logged In: Switch to personal session
+            currentSessionId = `private_${user.uid}`;
+            usernameDisplay.textContent = user.displayName || '사용자';
+            loginBtn.classList.add('hidden');
+            logoutBtn.classList.remove('hidden');
+        } else {
+            // Logged Out: Switch back to public session
+            currentSessionId = PUBLIC_SESSION_ID;
+            usernameDisplay.textContent = '비로그인 사용자';
+            loginBtn.classList.remove('hidden');
+            logoutBtn.classList.add('hidden');
+        }
+        
+        // Reset state and re-initialize listeners for the new session
+        clearExistingMapData();
+        initFirebaseListeners();
+    });
+}
+
+function handleNaverLogin() {
+    // Note: Naver login requires Firebase Console setup for 'OpenID Connect' or 'Generic OAuth'
+    // This is a placeholder for the logic; users need to configure the provider first.
+    alert("네이버 로그인은 Firebase Console에서 'Generic OAuth'를 설정해야 활성화됩니다. 현재는 개발 모드로 동작합니다.");
+    
+    // Temporary: Simulating login with an anonymous or custom user for testing phase
+    firebase.auth().signInAnonymously()
+        .catch(err => console.error("Login Error:", err));
+}
+
+function clearExistingMapData() {
+    // Clear Markers
+    Object.keys(markers).forEach(id => markers[id].setMap(null));
+    markers = {};
+    infoWindows = {};
+    allPlaces = [];
+    updateSidebarDisplay();
+}
+
 function initFirebaseListeners() {
     if (typeof firebase === 'undefined') return;
 
     const db = firebase.database();
-    const placesRef = db.ref(`shared_sessions/${SESSION_ID}/places`);
+    const path = currentSessionId === PUBLIC_SESSION_ID 
+        ? `shared_sessions/${PUBLIC_SESSION_ID}/places`
+        : `user_sessions/${currentSessionId}/places`;
+        
+    const placesRef = db.ref(path);
+
+    // Remove old listeners to avoid duplicates when switching sessions
+    placesRef.off();
 
     // Listen for new places added by anyone
     placesRef.on('child_added', (snapshot) => {
@@ -389,8 +446,14 @@ function renderPagination(totalPages) {
 
 // Global deletion function (to handle onclick from dynamic HTML)
 window.deletePlace = (id, name) => {
+    if (currentSessionId === PUBLIC_SESSION_ID) {
+        alert("전체 공유 리스트의 장소는 삭제할 수 없습니다.");
+        return;
+    }
+    
     if(confirm(`'${name}'을(를) 삭제하시겠습니까?`)) {
-        firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}`).remove();
+        const path = `user_sessions/${currentSessionId}/places/${id}`;
+        firebase.database().ref(path).remove();
     }
 };
 
@@ -399,9 +462,15 @@ window.toggleLike = (id) => {
     if (!place) return;
 
     const likes = place.likes || {};
-    const ref = firebase.database().ref(`shared_sessions/${SESSION_ID}/places/${id}/likes/${USERNAME}`);
+    const userId = currentUser ? currentUser.uid : 'anon_' + Math.random().toString(36).substr(2, 5);
+    
+    const path = currentSessionId === PUBLIC_SESSION_ID 
+        ? `shared_sessions/${PUBLIC_SESSION_ID}/places/${id}/likes/${userId}`
+        : `user_sessions/${currentSessionId}/places/${id}/likes/${userId}`;
 
-    if (likes[USERNAME]) {
+    const ref = firebase.database().ref(path);
+
+    if (likes[userId]) {
         ref.remove();
     } else {
         ref.set(true);
@@ -448,6 +517,7 @@ async function handleSearch() {
 
             if (geoResult) {
                 const searchAddress = item.roadAddress || item.address;
+                const displayName = currentUser ? (currentUser.displayName || currentUser.email) : '익명';
                 results.push({
                     name: cleanTitle,
                     address: searchAddress,
@@ -455,7 +525,7 @@ async function handleSearch() {
                     location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
                     // Save as v5 search URL with name only for App Handoff support
                     naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
-                    added_by: USERNAME
+                    added_by: displayName
                 });
             }
         }
@@ -500,7 +570,11 @@ function savePlaceToFirebase(placeData) {
     }
 
     const db = firebase.database();
-    const placesRef = db.ref(`shared_sessions/${SESSION_ID}/places`);
+    const path = currentSessionId === PUBLIC_SESSION_ID 
+        ? `shared_sessions/${PUBLIC_SESSION_ID}/places`
+        : `user_sessions/${currentSessionId}/places`;
+        
+    const placesRef = db.ref(path);
     
     placesRef.push(placeData)
         .then(() => {
