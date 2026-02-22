@@ -323,22 +323,24 @@ main {
 /* Affiliate Links */
 .affiliate-container {
     margin-bottom: 8px;
-    padding: 6px;
-    background: #fdfdfd;
-    border: 1px dashed #eee;
-    border-radius: 4px;
-}
-
-.aff-notice {
-    font-size: 10px;
-    color: #999;
-    display: block;
-    margin-bottom: 4px;
 }
 
 .affiliate-links {
     display: flex;
     gap: 6px;
+}
+
+.sidebar-footer {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.aff-global-notice {
+    font-size: 11px;
+    color: #999;
+    line-height: 1.4;
+    text-align: center;
 }
 
 .aff-btn {

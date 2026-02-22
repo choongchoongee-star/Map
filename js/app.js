@@ -659,16 +659,20 @@ function addMarker(id, data) {
 
     markers[id] = marker;
 
+    const cat = (data.category || '').toLowerCase();
+    const isFood = cat.includes('음식점') || cat.includes('식당') || cat.includes('카페') || cat.includes('육류') || cat.includes('요리');
+    const isStay = cat.includes('숙박') || cat.includes('호텔') || cat.includes('펜션') || cat.includes('민박');
+
     const infoWindow = new naver.maps.InfoWindow({
         content: `
             <div style="padding:10px; min-width:180px;">
                 <h4 style="margin:0 0 5px 0">${data.name}</h4>
                 <p style="font-size:12px; margin:0">${data.address}</p>
                 <div style="margin-top:8px;">
-                    <span style="font-size:10px; color:#999; display:block; margin-bottom:4px;">🤝 제휴 예약 (수수료 발생 가능)</span>
                     <div style="display:flex; gap:5px;">
-                        <a href="https://app.catchtable.co.kr/ct/search/integrated?keyword=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#ff3d00; color:white; text-decoration:none; border-radius:3px;">캐치테이블</a>
+                        ${isFood ? `<a href="https://app.catchtable.co.kr/ct/search/integrated?keyword=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#ff3d00; color:white; text-decoration:none; border-radius:3px;">캐치테이블</a>` : ''}
                         <a href="https://m.booking.naver.com/booking/search?query=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#03c75a; color:white; text-decoration:none; border-radius:3px;">네이버 예약</a>
+                        ${isStay ? `<a href="https://www.stayfolio.com/search?q=${encodeURIComponent(data.name)}" target="_blank" style="font-size:11px; padding:2px 5px; background:#2c3e50; color:white; text-decoration:none; border-radius:3px;">스테이폴리오</a>` : ''}
                     </div>
                 </div>
                 <div style="margin-top:8px;">
@@ -818,7 +822,11 @@ function renderPlaceList(items) {
         const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
-        // Affiliate URLs (Search-based)
+        // Smart Affiliate Logic: Only show buttons based on category
+        const cat = (place.category || '').toLowerCase();
+        const isFood = cat.includes('음식점') || cat.includes('식당') || cat.includes('카페') || cat.includes('육류') || cat.includes('요리');
+        const isStay = cat.includes('숙박') || cat.includes('호텔') || cat.includes('펜션') || cat.includes('민박');
+
         const catchtableUrl = `https://app.catchtable.co.kr/ct/search/integrated?keyword=${encodeURIComponent(place.name)}`;
         const naverBookingUrl = `https://m.booking.naver.com/booking/search?query=${encodeURIComponent(place.name)}`;
         const stayfolioUrl = `https://www.stayfolio.com/search?q=${encodeURIComponent(place.name)}`;
@@ -839,11 +847,10 @@ function renderPlaceList(items) {
                     <h4>${place.name}</h4>
                     <p>${place.address}</p>
                     <div class="affiliate-container">
-                        <span class="aff-notice">🤝 제휴사 예약/상세 (수수료 발생 가능)</span>
                         <div class="affiliate-links">
-                            <a href="${catchtableUrl}" target="_blank" class="aff-btn ct" title="캐치테이블">C</a>
-                            <a href="${naverBookingUrl}" target="_blank" class="aff-btn nb" title="네이버 예약">N</a>
-                            <a href="${stayfolioUrl}" target="_blank" class="aff-btn sf" title="스테이폴리오">S</a>
+                            ${isFood ? `<a href="${catchtableUrl}" target="_blank" class="aff-btn ct" title="캐치테이블 예약 확인">C</a>` : ''}
+                            <a href="${naverBookingUrl}" target="_blank" class="aff-btn nb" title="네이버 예약 확인">N</a>
+                            ${isStay ? `<a href="${stayfolioUrl}" target="_blank" class="aff-btn sf" title="스테이폴리오 상세 확인">S</a>` : ''}
                         </div>
                     </div>
                     <div class="place-actions">
