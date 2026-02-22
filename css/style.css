@@ -345,20 +345,25 @@ main {
 }
 
 .save-to-my-btn {
-    background: #f1f8ff;
-    border: 1px solid #007bff;
+    background: none;
+    border: none;
     color: #007bff;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
+    padding: 2px 4px;
+    font-size: 1.1rem;
     cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
+    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
 }
 
 .save-to-my-btn:hover {
-    background: #007bff;
-    color: white;
+    transform: scale(1.2);
+    background: none;
+    color: #0056b3;
+}
+
+.save-to-my-btn.is-saved {
+    color: #f1c40f; /* Gold for saved bookmark */
 }
 
 .like-btn:hover {

@@ -44,6 +44,17 @@ const createSessionBtn = document.getElementById('create-session-btn');
 const joinSessionCodeInput = document.getElementById('join-session-code');
 const joinSessionBtn = document.getElementById('join-session-btn');
 const userSessionsList = document.getElementById('user-sessions-list');
+const saveTargetModal = document.getElementById('save-target-modal');
+const targetSessionsList = document.getElementById('target-sessions-list');
+const confirmSaveBtn = document.getElementById('confirm-save-btn');
+const closeSaveModal = document.getElementById('close-save-modal');
+
+// Global state for copying
+let lastTargetSessionId = localStorage.getItem('lastTargetSessionId') || null;
+let sessionToCopyId = null;
+let placeToCopyData = null;
+let userSessionsCache = {}; // Cache of user's session names
+let savedPlacesMap = {}; // Map of name+address to boolean
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -82,6 +93,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     createSessionBtn.addEventListener('click', createSharedSession);
     joinSessionBtn.addEventListener('click', joinSharedSession);
+
+    // Save Modal Events
+    closeSaveModal.addEventListener('click', () => {
+        saveTargetModal.classList.add('hidden');
+    });
+
+    confirmSaveBtn.addEventListener('click', () => {
+        if (sessionToCopyId && placeToCopyData) {
+            executeCopyPlace(sessionToCopyId, placeToCopyData);
+        }
+    });
 
     // Sidebar Toggle for Mobile
     menuToggle.addEventListener('click', () => {
@@ -175,10 +197,15 @@ function updateSessionOptions(user) {
     
     if (user) {
         // Add private session
+        const privateId = `private_${user.uid}`;
         const privateOpt = document.createElement('option');
-        privateOpt.value = `private_${user.uid}`;
+        privateOpt.value = privateId;
         privateOpt.textContent = "내 개인 리스트";
         sessionSelect.appendChild(privateOpt);
+
+        // Pre-fill cache
+        userSessionsCache = { [privateId]: "내 개인 리스트" };
+        if (!lastTargetSessionId) lastTargetSessionId = privateId;
 
         // Fetch shared sessions from user profile
         const db = firebase.database();
@@ -188,11 +215,14 @@ function updateSessionOptions(user) {
             sessionSelect.innerHTML = `<option value="${PUBLIC_SESSION_ID}">전체 공유 리스트</option>`;
             sessionSelect.appendChild(privateOpt);
             
+            userSessionsCache = { [privateId]: "내 개인 리스트" };
             Object.keys(sessions).forEach(sid => {
                 const opt = document.createElement('option');
                 opt.value = sid;
-                opt.textContent = sessions[sid].name || "친구와 공유된 리스트";
+                const name = sessions[sid].name || "친구와 공유된 리스트";
+                opt.textContent = name;
                 sessionSelect.appendChild(opt);
+                userSessionsCache[sid] = name;
             });
 
             // Keep correct selection
@@ -200,10 +230,33 @@ function updateSessionOptions(user) {
             
             // Also update the management list in the modal
             renderSessionManagementList(sessions);
+            
+            // Start listening to all these sessions for "Saved" markers
+            listenToAllUserSessions(user.uid, sessions);
         });
     } else {
         renderSessionManagementList({}); // Clear if logged out
+        savedPlacesMap = {};
     }
+}
+
+function listenToAllUserSessions(uid, sessions) {
+    const db = firebase.database();
+    savedPlacesMap = {};
+    
+    const allSessionIds = [`private_${uid}`, ...Object.keys(sessions)];
+    
+    allSessionIds.forEach(sid => {
+        const path = sid.startsWith('private_') ? `user_sessions/${sid}/places` : `shared_sessions/${sid}/places`;
+        db.ref(path).on('value', (snapshot) => {
+            const places = snapshot.val() || {};
+            Object.values(places).forEach(p => {
+                savedPlacesMap[`${p.name}|${p.address}`] = true;
+            });
+            // Update UI to reflect changes
+            updateSidebarDisplay();
+        });
+    });
 }
 
 function renderSessionManagementList(sessions) {
@@ -640,6 +693,7 @@ function renderPlaceList(items) {
         const likeCount = Object.keys(likes).length;
         const userId = currentUser ? currentUser.uid : 'anon';
         const isLiked = !!likes[userId];
+        const isSaved = savedPlacesMap[`${place.name}|${place.address}`];
         const showSaveBtn = currentUser && currentSessionId === PUBLIC_SESSION_ID;
 
         const li = document.createElement('li');
@@ -657,8 +711,8 @@ function renderPlaceList(items) {
                             <span class="like-count">${likeCount}</span>
                         </button>
                         ${showSaveBtn ? `
-                        <button class="save-to-my-btn" onclick="event.stopPropagation(); copyPlace('${place.id}')" title="내 리스트로 저장">
-                            📥 저장
+                        <button class="save-to-my-btn ${isSaved ? 'is-saved' : ''}" onclick="event.stopPropagation(); copyPlace('${place.id}')" title="내 리스트에 저장">
+                            ${isSaved ? '🔖' : '📑'}
                         </button>
                         ` : ''}
                         <a href="${reliableNaverUrl}" target="_blank" rel="noopener noreferrer" class="naver-link" style="font-size: 12px; color: #27ae60; text-decoration: none; font-weight: bold;">네이버 지도로 보기</a>
@@ -754,41 +808,85 @@ window.copyPlace = (id) => {
     const placeToCopy = allPlaces.find(p => p.id === id);
     if (!placeToCopy) return;
 
-    // By default, copy to the user's private session.
-    // In a more advanced version, we could show a modal to choose the target session.
-    const targetSessionId = `private_${currentUser.uid}`;
-    const targetPath = `user_sessions/${targetSessionId}/places`;
+    placeToCopyData = placeToCopy;
+    openSaveTargetModal();
+};
+
+function openSaveTargetModal() {
+    targetSessionsList.innerHTML = '';
+    
+    // Default selection: lastTargetSessionId or the private one
+    if (!lastTargetSessionId && currentUser) {
+        lastTargetSessionId = `private_${currentUser.uid}`;
+    }
+    
+    sessionToCopyId = lastTargetSessionId;
+
+    Object.keys(userSessionsCache).forEach(sid => {
+        const li = document.createElement('li');
+        li.className = 'session-row';
+        li.style.cursor = 'pointer';
+        li.style.padding = '12px';
+        li.style.border = sid === sessionToCopyId ? '2px solid #4285F4' : '1px solid #eee';
+
+        li.innerHTML = `
+            <div class="session-row-info">
+                <span class="session-name">${userSessionsCache[sid]}</span>
+                <span class="session-code-display">${sid.startsWith('private_') ? '개인 보관함' : '공유 세션'}</span>
+            </div>
+            ${sid === sessionToCopyId ? '<span style="color:#4285F4; font-weight:bold;">✔ 선택됨</span>' : ''}
+        `;
+        
+        li.onclick = () => {
+            sessionToCopyId = sid;
+            openSaveTargetModal(); // Refresh to show selection
+        };
+        targetSessionsList.appendChild(li);
+    });
+
+    saveTargetModal.classList.remove('hidden');
+}
+
+function executeCopyPlace(targetSessionId, placeData) {
+    const targetPath = targetSessionId.startsWith('private_') 
+        ? `user_sessions/${targetSessionId}/places`
+        : `shared_sessions/${targetSessionId}/places`;
     const db = firebase.database();
 
-    // Check for duplicates in the target private session
+    // Check for duplicates in the target session
     db.ref(targetPath).once('value', (snapshot) => {
-        const privatePlaces = snapshot.val() || {};
-        const isAlreadyAdded = Object.values(privatePlaces).some(p => 
-            p.name === placeToCopy.name && p.address === placeToCopy.address
+        const places = snapshot.val() || {};
+        const isAlreadyAdded = Object.values(places).some(p => 
+            p.name === placeData.name && p.address === placeData.address
         );
 
         if (isAlreadyAdded) {
-            alert(`'${placeToCopy.name}'은(는) 이미 내 리스트에 있습니다.`);
+            alert(`'${placeData.name}'은(는) 이미 선택한 목록에 있습니다.`);
             return;
         }
 
         // Copy the data (exclude the ID and old likes)
         const newPlaceData = {
-            name: placeToCopy.name,
-            address: placeToCopy.address,
-            category: placeToCopy.category,
-            location: placeToCopy.location,
-            naver_url: placeToCopy.naver_url,
+            name: placeData.name,
+            address: placeData.address,
+            category: placeData.category,
+            location: placeData.location,
+            naver_url: placeData.naver_url,
             added_by: currentUser.displayName || currentUser.email,
             copied_from: currentSessionId,
             created_at: firebase.database.ServerValue.TIMESTAMP
         };
 
         db.ref(targetPath).push(newPlaceData)
-            .then(() => alert(`'${placeToCopy.name}'을(를) 내 리스트에 저장했습니다!`))
+            .then(() => {
+                lastTargetSessionId = targetSessionId;
+                localStorage.setItem('lastTargetSessionId', targetSessionId);
+                alert(`'${placeData.name}'을(를) '${userSessionsCache[targetSessionId]}' 목록에 저장했습니다!`);
+                saveTargetModal.classList.add('hidden');
+            })
             .catch(err => console.error("복사 오류:", err));
     });
-};
+}
 
 // 6. Search & Persistence Logic
 async function handleSearch() {
