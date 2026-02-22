@@ -82,18 +82,28 @@
 
         <div id="session-modal" class="modal hidden">
             <div class="modal-content">
-                <h3>공유 세션 관리</h3>
+                <h3>목록 및 공유 관리</h3>
+                <div class="session-management-list">
+                    <h4>내 목록 리스트</h4>
+                    <ul id="user-sessions-list" class="styled-list">
+                        <!-- 사용자가 소유하거나 참여 중인 세션 목록 -->
+                    </ul>
+                </div>
+                <hr>
                 <div class="session-actions">
                     <div class="action-group">
-                        <h4>새 공유 세션 생성</h4>
-                        <input type="text" id="new-session-name" placeholder="세션 이름 (예: 친구들과 맛집)">
-                        <button id="create-session-btn">생성</button>
+                        <h4>새 목록 생성</h4>
+                        <div class="input-row">
+                            <input type="text" id="new-session-name" placeholder="목록 이름">
+                            <button id="create-session-btn">생성</button>
+                        </div>
                     </div>
-                    <hr>
                     <div class="action-group">
-                        <h4>세션 참여 (코드로 초대)</h4>
-                        <input type="text" id="join-session-code" placeholder="초대 코드 입력">
-                        <button id="join-session-btn">참여</button>
+                        <h4>초대 코드로 참여</h4>
+                        <div class="input-row">
+                            <input type="text" id="join-session-code" placeholder="초대 코드 입력">
+                            <button id="join-session-btn">참여</button>
+                        </div>
                     </div>
                 </div>
                 <button id="close-session-modal">닫기</button>

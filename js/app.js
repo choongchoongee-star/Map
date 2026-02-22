@@ -43,6 +43,7 @@ const newSessionNameInput = document.getElementById('new-session-name');
 const createSessionBtn = document.getElementById('create-session-btn');
 const joinSessionCodeInput = document.getElementById('join-session-code');
 const joinSessionBtn = document.getElementById('join-session-btn');
+const userSessionsList = document.getElementById('user-sessions-list');
 
 // 2. Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -179,7 +180,7 @@ function updateSessionOptions(user) {
         privateOpt.textContent = "내 개인 리스트";
         sessionSelect.appendChild(privateOpt);
 
-        // Fetch shared sessions from user profile (metadata)
+        // Fetch shared sessions from user profile
         const db = firebase.database();
         db.ref(`users/${user.uid}/sessions`).on('value', (snapshot) => {
             const sessions = snapshot.val() || {};
@@ -196,8 +197,94 @@ function updateSessionOptions(user) {
 
             // Keep correct selection
             sessionSelect.value = currentSessionId;
+            
+            // Also update the management list in the modal
+            renderSessionManagementList(sessions);
         });
+    } else {
+        renderSessionManagementList({}); // Clear if logged out
     }
+}
+
+function renderSessionManagementList(sessions) {
+    if (!userSessionsList) return;
+    userSessionsList.innerHTML = '';
+
+    if (!currentUser) {
+        userSessionsList.innerHTML = '<li>로그인이 필요합니다.</li>';
+        return;
+    }
+
+    // 1. Add Private Session (The default one)
+    const privateSessionId = `private_${currentUser.uid}`;
+    addSessionRowToModal(privateSessionId, "내 개인 리스트 (기본)", true);
+
+    // 2. Add Other Shared Sessions
+    Object.keys(sessions).forEach(sid => {
+        addSessionRowToModal(sid, sessions[sid].name, false);
+    });
+}
+
+function addSessionRowToModal(sessionId, name, isDefaultPrivate) {
+    const li = document.createElement('li');
+    li.className = 'session-row';
+    
+    // We'll need to check if the user is the creator for the delete button
+    // For now, let's show delete for any session they joined (Leave) 
+    // and creator (Delete)
+    
+    li.innerHTML = `
+        <div class="session-row-info">
+            <span class="session-name">${name}</span>
+            <span class="session-code-display">코드: ${sessionId}</span>
+        </div>
+        <div class="session-row-actions">
+            <button class="action-btn-small copy-code-btn" onclick="copySessionCode('${sessionId}')">코드 복사</button>
+            ${!isDefaultPrivate ? `<button class="action-btn-small delete-session-btn" onclick="deleteSession('${sessionId}', '${name}')">삭제</button>` : ''}
+        </div>
+    `;
+    userSessionsList.appendChild(li);
+}
+
+window.copySessionCode = (code) => {
+    navigator.clipboard.writeText(code).then(() => {
+        alert("초대 코드가 클립보드에 복사되었습니다: " + code);
+    }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        // Fallback for some environments
+        const textArea = document.createElement("textarea");
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert("초대 코드가 복사되었습니다: " + code);
+    });
+};
+
+function deleteSession(sessionId, name) {
+    if (!currentUser) return;
+    if (!confirm(`'${name}' 목록을 삭제하시겠습니까? (더 이상 이 리스트를 볼 수 없게 됩니다)`)) return;
+
+    const db = firebase.database();
+    
+    // 1. Remove from user's sessions list
+    db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).remove()
+        .then(() => {
+            // 2. If it's a shared session, we could check if user is creator to delete entirely
+            // but for now, "delete" just means "remove from my view" unless we want full cleanup.
+            // Let's also remove user from session members.
+            if (sessionId.startsWith('shared_')) {
+                return db.ref(`shared_sessions/${sessionId}/members/${currentUser.uid}`).remove();
+            }
+        })
+        .then(() => {
+            if (currentSessionId === sessionId) {
+                handleSessionSwitch(PUBLIC_SESSION_ID);
+            }
+            alert(`'${name}' 목록이 삭제되었습니다.`);
+        })
+        .catch(err => console.error("세션 삭제 오류:", err));
 }
 
 function handleSessionSwitch(sessionId) {
@@ -244,7 +331,7 @@ function createSharedSession() {
             return db.ref(`users/${currentUser.uid}/sessions/${sessionId}`).set({ name: name });
         })
         .then(() => {
-            alert(`새 세션이 생성되었습니다! 초대 코드: ${sessionId}\n친구에게 이 코드를 공유하세요.`);
+            alert(`새 목록 '${name}'이(가) 생성되었습니다.`);
             newSessionNameInput.value = '';
             sessionModal.classList.add('hidden');
             handleSessionSwitch(sessionId);
@@ -259,7 +346,30 @@ function joinSharedSession() {
 
     const db = firebase.database();
     
-    // 1. Check if session exists
+    // Logic to handle both shared_ and private_ sessions
+    let sessionPath = '';
+    if (code.startsWith('private_')) {
+        // If it's a private session, it's stored in user_sessions
+        // We'll treat its "places" as the shared data
+        sessionPath = `user_sessions/${code}/places`;
+        
+        // Check if it exists by checking for places or just trying to join
+        db.ref(`user_sessions/${code}`).once('value', (snapshot) => {
+            if (!snapshot.exists()) return alert("유효하지 않은 초대 코드입니다.");
+            
+            // Add to user's profile
+            db.ref(`users/${currentUser.uid}/sessions/${code}`).set({ name: "공유받은 개인 리스트" })
+                .then(() => {
+                    alert(`개인 리스트에 성공적으로 참여했습니다!`);
+                    joinSessionCodeInput.value = '';
+                    sessionModal.classList.add('hidden');
+                    handleSessionSwitch(code);
+                });
+        });
+        return;
+    }
+
+    // Standard shared session logic
     db.ref(`shared_sessions/${code}/metadata`).once('value', (snapshot) => {
         const metadata = snapshot.val();
         if (!metadata) return alert("유효하지 않은 초대 코드입니다.");
