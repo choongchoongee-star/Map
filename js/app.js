@@ -124,8 +124,8 @@ function initFirebaseListeners() {
 
 // 5. UI Updates (Marker)
 function addMarker(id, data) {
-    // Use mobile-optimized URL which redirects correctly on both PC and Mobile
-    const reliableNaverUrl = `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(data.name + ' ' + data.address)}`;
+    // Search by name only and use v5 URL for better App Handoff support
+    const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(data.name)}`;
 
     const position = new naver.maps.LatLng(data.location.lat, data.location.lng);
     const marker = new naver.maps.Marker({
@@ -206,7 +206,7 @@ function renderPlaceList(items) {
     }
 
     items.forEach(place => {
-        const reliableNaverUrl = `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(place.name + ' ' + place.address)}`;
+        const reliableNaverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
         const li = document.createElement('li');
         li.className = 'place-item';
         li.id = `sidebar-${place.id}`;
@@ -313,8 +313,8 @@ async function handleSearch() {
                     address: searchAddress,
                     category: item.category,
                     location: { lat: parseFloat(geoResult.y), lng: parseFloat(geoResult.x) },
-                    // Save as mobile-optimized search URL
-                    naver_url: `https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(cleanTitle + ' ' + searchAddress)}`,
+                    // Save as v5 search URL with name only for App Handoff support
+                    naver_url: `https://map.naver.com/v5/search/${encodeURIComponent(cleanTitle)}`,
                     added_by: USERNAME
                 });
             }
