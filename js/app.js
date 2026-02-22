@@ -874,10 +874,36 @@ function renderPagination(totalPages) {
     
     if (totalPages <= 1) return;
 
-    for (let i = 1; i <= totalPages; i++) {
+    // Window size for pagination (e.g., 5 buttons at a time)
+    const windowSize = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(windowSize / 2));
+    let endPage = startPage + windowSize - 1;
+
+    if (endPage > totalPages) {
+        endPage = totalPages;
+        startPage = Math.max(1, endPage - windowSize + 1);
+    }
+
+    // Previous Arrow
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-btn arrow';
+    prevBtn.innerHTML = '&laquo;';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updateSidebarDisplay();
+            sidebar.scrollTop = 0;
+        }
+    };
+    paginationContainer.appendChild(prevBtn);
+
+    // Page Numbers
+    for (let i = startPage; i <= endPage; i++) {
         const btn = document.createElement('button');
         btn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
         btn.textContent = i;
+        if (i === currentPage) btn.setAttribute('aria-current', 'page');
         btn.onclick = () => {
             currentPage = i;
             updateSidebarDisplay();
@@ -885,6 +911,20 @@ function renderPagination(totalPages) {
         };
         paginationContainer.appendChild(btn);
     }
+
+    // Next Arrow
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-btn arrow';
+    nextBtn.innerHTML = '&raquo;';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateSidebarDisplay();
+            sidebar.scrollTop = 0;
+        }
+    };
+    paginationContainer.appendChild(nextBtn);
 }
 
 // Global deletion function (to handle onclick from dynamic HTML)
