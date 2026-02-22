@@ -489,6 +489,16 @@ function savePlaceToFirebase(placeData) {
         return;
     }
 
+    // Duplicate Check: compare by name and address
+    const isDuplicate = allPlaces.some(p => 
+        p.name === placeData.name && p.address === placeData.address
+    );
+
+    if (isDuplicate) {
+        alert(`'${placeData.name}'은(는) 이미 리스트에 추가된 장소입니다.`);
+        return;
+    }
+
     const db = firebase.database();
     const placesRef = db.ref(`shared_sessions/${SESSION_ID}/places`);
     
